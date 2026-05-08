@@ -1,0 +1,62 @@
+export const JUTSUS = {
+  BUNSHIN: {
+    id: 'BUNSHIN',
+    name: 'Bunshin no Jutsu',
+    subtitle: 'Moltiplicazione del Corpo',
+    character: 'Naruto',
+    sequence: ['Croce'],
+    effectType: 'clone',
+    color: '#C084FC',
+    glowColor: 'rgba(192,132,252,0.6)',
+    kanji: '分身',
+  },
+  CHIDORI: {
+    id: 'CHIDORI',
+    name: 'Chidori',
+    subtitle: 'Mille Falchi',
+    character: 'Sasuke · Kakashi',
+    sequence: ['Bue', 'Lepre', 'Scimmia'],
+    effectType: 'lightning',
+    color: '#38BDF8',
+    glowColor: 'rgba(56,189,248,0.6)',
+    kanji: '千鳥',
+  },
+  RASENGAN: {
+    id: 'RASENGAN',
+    name: 'Rasengan',
+    subtitle: 'Sfera Rotante',
+    character: 'Naruto',
+    sequence: ['Rana', 'Cinghiale', 'Ariete'],
+    effectType: 'wind',
+    color: '#F97316',
+    glowColor: 'rgba(249,115,22,0.6)',
+    kanji: '螺旋丸',
+  },
+  KATON: {
+    id: 'KATON',
+    name: 'Katon · Gōkakyū',
+    subtitle: 'Grande Sfera di Fuoco',
+    character: 'Sasuke · Clan Uchiha',
+    sequence: ['Serpente', 'Cavallo', 'Tigre'],
+    effectType: 'fire',
+    color: '#EF4444',
+    glowColor: 'rgba(239,68,68,0.6)',
+    kanji: '火遁',
+  },
+  KAGE_BUNSHIN: {
+    id: 'KAGE_BUNSHIN',
+    name: 'Kage Bunshin',
+    subtitle: "Cloni d'Ombra",
+    character: 'Naruto',
+    sequence: ['Serpente', 'Ariete', 'Cane'],
+    effectType: 'shadow',
+    color: '#A855F7',
+    glowColor: 'rgba(168,85,247,0.6)',
+    kanji: '影分身',
+  },
+};
+
+// All unique seals needed across all jutsu
+export const SEALS_LIST = [...new Set(
+  Object.values(JUTSUS).flatMap(j => j.sequence)
+)];
