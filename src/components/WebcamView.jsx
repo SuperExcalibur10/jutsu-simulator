@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useHandTracking } from '../hooks/useHandTracking';
 
-const WebcamView = ({ onResults }) => {
+const WebcamView = ({ onResults, currentSong }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const requestRef = useRef(null);
@@ -9,7 +9,73 @@ const WebcamView = ({ onResults }) => {
   const [devices, setDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
 
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+
   const { isLoaded, error, detectHands } = useHandTracking(videoRef);
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+        // Stop all tracks of the captured stream
+        if (mediaRecorderRef.current.stream) {
+          mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+      }
+      setIsRecording(false);
+    } else {
+      try {
+        // Use getDisplayMedia to capture everything (webcam + effects + UI)
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: 'browser' },
+          audio: true // Optional: captures jutsu sounds
+        });
+
+        recordedChunksRef.current = [];
+        mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        
+        mediaRecorderRef.current.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            recordedChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorderRef.current.onstop = () => {
+          const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = `jutsu-record-${new Date().getTime()}.webm`;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }, 100);
+          
+          // Ensure tracks are stopped if recorder was stopped programmatically
+          stream.getTracks().forEach(track => track.stop());
+          setIsRecording(false);
+        };
+
+        // Handle case where user clicks "Stop sharing" in the browser UI
+        stream.getVideoTracks()[0].onended = () => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+          }
+        };
+
+        mediaRecorderRef.current.start();
+        setIsRecording(true);
+      } catch (e) {
+        console.error("Error starting Screen Capture:", e);
+        alert("Per registrare gli effetti è necessario autorizzare la cattura della scheda/schermo.");
+      }
+    }
+  };
 
   // Ottieni la lista delle telecamere disponibili
   useEffect(() => {
@@ -141,6 +207,33 @@ const WebcamView = ({ onResults }) => {
       )}
 
       <div style={{ position: 'relative', flex: 1, overflow: 'hidden', borderRadius: '1.5rem', border: '1px solid var(--panel-border)' }}>
+        {isRecording && (
+          <div className="rec-indicator">
+            <div className="rec-dot"></div>
+            <span className="rec-text">REC</span>
+          </div>
+        )}
+
+        <div className="rec-btn-container">
+          <button className={`rec-btn ${isRecording ? 'recording' : ''}`} onClick={toggleRecording}>
+            {isRecording ? '⏹ Ferma Registrazione' : '🔴 Registra Jutsu'}
+          </button>
+
+          {/* Music Player Widget (Now stacked under record button) */}
+          {currentSong && (
+            <div className="music-player-widget">
+              <div className="music-icon">
+                <div className="music-bar" />
+                <div className="music-bar" />
+                <div className="music-bar" />
+              </div>
+              <div className="music-text">
+                NOW PLAYING <span className="music-title">{currentSong.title}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
         {!isLoaded && (
           <div className="absolute-fill flex-center glass-panel" style={{ zIndex: 10 }}>
             <h2 className="title-glow" style={{ animation: 'pulse-glow 1.5s infinite' }}>Caricamento Chakra...</h2>

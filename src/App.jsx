@@ -4,8 +4,14 @@ import JutsuEffect from './components/JutsuEffect';
 import { extractFeatures, classifySeal } from './utils/sealClassifier';
 import { JUTSUS, SEALS_LIST } from './utils/jutsuEngine';
 
-const STORAGE_KEY = 'jutsu_sim_v4_seals';
 const SEAL_HOLD_FRAMES = 18; // ~600ms at 30fps before a seal is "confirmed"
+const STORAGE_KEY_SEALS = 'jutsu_sim_v4_seals';
+
+const BACKGROUND_MUSIC = [
+  { title: "Blue Bird", file: "/sounds/Blue Bird.mp3" },
+  { title: "Sign", file: "/sounds/Sign.mp3" },
+  { title: "Silhouette", file: "/sounds/Silhouette.mp3" }
+];
 
 function App() {
   /* ── Core state ─────────────────────────────── */
@@ -34,6 +40,11 @@ function App() {
   /* ── Jutsu effect ───────────────────────────── */
   const [activeJutsu, setActiveJutsu] = useState(null);
 
+  /* ── Music state ────────────────────────────── */
+  const [currentSong, setCurrentSong] = useState(null);
+  const audioRef = useRef(new Audio());
+  const musicStartedRef = useRef(false);
+
   /* ── Recalibrate menu ───────────────────────── */
   const [selectedForRecal, setSelectedForRecal] = useState(new Set());
 
@@ -42,9 +53,38 @@ function App() {
   useEffect(() => { selectedJutsuRef.current = selectedJutsu; }, [selectedJutsu]);
   useEffect(() => { sequenceStepRef.current = sequenceStep; }, [sequenceStep]);
 
+  /* ── Music Logic ────────────────────────────── */
+  useEffect(() => {
+    const playRandom = () => {
+      const randomSong = BACKGROUND_MUSIC[Math.floor(Math.random() * BACKGROUND_MUSIC.length)];
+      setCurrentSong(randomSong);
+      audioRef.current.src = randomSong.file;
+      audioRef.current.volume = 0.25;
+      audioRef.current.play().catch(() => {
+        // Fallback: wait for first interaction if blocked
+        const startOnInteract = () => {
+          if (!musicStartedRef.current) {
+            audioRef.current.play();
+            musicStartedRef.current = true;
+          }
+          window.removeEventListener('click', startOnInteract);
+        };
+        window.addEventListener('click', startOnInteract);
+      });
+    };
+
+    audioRef.current.onended = playRandom;
+    playRandom();
+
+    return () => {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    };
+  }, []);
+
   /* ── Init: load saved calibration ──────────── */
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(STORAGE_KEY_SEALS);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -55,7 +95,7 @@ function App() {
         setCalibratedSeals(parsed);
         calibratedSealsRef.current = parsed;
       } catch {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY_SEALS);
       }
     }
     setMode('jutsu-select');
@@ -95,7 +135,7 @@ function App() {
 
     setCalibratedSeals(prev => {
       const updated = { ...prev, [sealName]: features };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(STORAGE_KEY_SEALS, JSON.stringify(updated));
       calibratedSealsRef.current = updated;
       return updated;
     });
@@ -107,8 +147,14 @@ function App() {
     if (calibrationIndex < calibrationQueue.length - 1) {
       setCalibrationIndex(i => i + 1);
     } else {
-      // All needed seals calibrated → start performance
-      setTimeout(() => startPerform(0), 800);
+      // All needed seals calibrated
+      setTimeout(() => {
+        if (selectedJutsuRef.current) {
+          startPerform(0);
+        } else {
+          setMode('jutsu-select');
+        }
+      }, 800);
     }
   }, [calibrationQueue, calibrationIndex]);
 
@@ -155,8 +201,13 @@ function App() {
 
       if (recognized === targetSeal) {
         sealHoldCountRef.current++;
+        const progress = Math.min((sealHoldCountRef.current / SEAL_HOLD_FRAMES) * 100, 100);
+        const fill = document.getElementById('chakra-fill');
+        if (fill) fill.style.width = `${progress}%`;
+
         if (sealHoldCountRef.current >= SEAL_HOLD_FRAMES) {
           sealHoldCountRef.current = 0;
+          if (fill) fill.style.width = '0%';
           const nextStep = sequenceStepRef.current + 1;
           setStepFlash(true);
           setTimeout(() => setStepFlash(false), 500);
@@ -173,7 +224,11 @@ function App() {
           }
         }
       } else {
-        sealHoldCountRef.current = 0;
+        if (sealHoldCountRef.current > 0) {
+          sealHoldCountRef.current = 0;
+          const fill = document.getElementById('chakra-fill');
+          if (fill) fill.style.width = '0%';
+        }
       }
     }
   }, [mode]);
@@ -217,8 +272,19 @@ function App() {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', gap: '1.25rem', padding: '1.25rem', boxSizing: 'border-box' }}>
 
+      {/* Sidebar Background (For layering) */}
+      <div className="sidebar-bg glass-panel" style={{ position: 'absolute', top: '1.25rem', left: '1.25rem', bottom: '1.25rem', width: '310px', zIndex: 1, pointerEvents: 'none' }}></div>
+
+      {/* Decorative Kakashi (Between background and content) */}
+      <img src={`/assets/kakashi.png?v=${new Date().getTime()}`} className="deco-kakashi" style={{ zIndex: 2 }} alt="" />
+
       {/* ── Left Sidebar ─────────────────────── */}
-      <div className="glass-panel" style={{ width: '310px', flexShrink: 0, display: 'flex', flexDirection: 'column', padding: '1.5rem', gap: '1.25rem', overflowY: 'auto', zIndex: 10 }}>
+      <div className="sidebar" style={{ width: '310px', flexShrink: 0, display: 'flex', flexDirection: 'column', padding: '1.5rem', gap: '1.25rem', overflowY: 'auto', zIndex: 10, position: 'relative' }}>
+
+
+
+
+
 
         {/* Logo */}
         <div>
@@ -239,17 +305,27 @@ function App() {
                 return (
                   <button
                     key={jutsu.id}
+                    className="jutsu-card-refined"
                     onClick={() => handleSelectJutsu(jutsu)}
                     style={{
+                      '--card-glow': jutsu.glowColor.replace('0.6','0.3'),
                       background: `linear-gradient(135deg, ${jutsu.glowColor.replace('0.6','0.12')}, rgba(0,0,0,0.3))`,
                       border: `1px solid ${jutsu.glowColor.replace('0.6','0.35')}`,
                       borderRadius: '1rem', padding: '0.9rem 1rem',
                       cursor: 'pointer', textAlign: 'left', color: 'var(--text-main)',
-                      transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
+                      position: 'relative', overflow: 'hidden',
+                      display: 'block', width: '100%'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 0 24px ${jutsu.glowColor}`; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
                   >
+                    {/* Character background image */}
+                    <div style={{
+                      position: 'absolute', right: '0%', top: '50%', transform: 'translateY(-50%)', 
+                      height: '130%', width: '60%', opacity: 0.35, pointerEvents: 'none', 
+                      mixBlendMode: 'screen', filter: 'grayscale(30%)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <img src={`/characters/${jutsu.imageId}.png`} alt="" style={{ height: '100%', objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
+                    </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', letterSpacing: '0.08em', color: jutsu.color }}>
@@ -385,6 +461,9 @@ function App() {
               }}>
                 {currentSeal || '· · ·'}
               </div>
+              <div className="chakra-gauge-container">
+                <div id="chakra-fill" className="chakra-gauge-fill" />
+              </div>
             </div>
 
             {/* Sequence steps */}
@@ -417,15 +496,23 @@ function App() {
                       </div>
                       {/* Seal mini image */}
                       <div style={{
-                        width: '40px', height: '40px', borderRadius: '0.4rem',
-                        overflow: 'hidden', flexShrink: 0, opacity: isNext ? 0.35 : 1,
-                        background: 'rgba(0,0,0,0.4)',
-                        border: `1px solid ${isCurrent ? selectedJutsu.glowColor.replace('0.6','0.4') : 'rgba(255,255,255,0.06)'}`,
+                        width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)',
+                        borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: `1px solid ${isCurrent ? selectedJutsu.color : 'rgba(255,255,255,0.1)'}`,
+                        position: 'relative', overflow: 'hidden'
                       }}>
-                        <img src={`/seals/${sealName.toLowerCase()}.png`} alt={sealName}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={e => { e.target.style.display = 'none'; }}
+                        <img
+                          src={`/seals/${sealName.toLowerCase()}.png`}
+                          alt=""
+                          style={{ width: '80%', height: '80%', objectFit: 'contain', filter: isCurrent ? 'none' : 'grayscale(1) opacity(0.5)' }}
+                          onError={e => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
                         />
+                        <div style={{ display: 'none', fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
+                          {sealName[0]}
+                        </div>
                       </div>
                       <div>
                         <div style={{ fontFamily: 'var(--font-title)', fontSize: '0.95rem', letterSpacing: '0.06em', color: isDone ? '#22c55e' : isCurrent ? selectedJutsu.color : 'var(--text-muted)' }}>
@@ -454,8 +541,16 @@ function App() {
       </div>
 
       {/* ── Webcam ───────────────────────────── */}
-      <div className="glass-panel" style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <WebcamView onResults={handleWebcamResults} />
+      <div className="glass-panel webcam-container" style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {/* Naruto Logo (Now inside webcam) */}
+        <img src={`/assets/naruto_logo.png?v=${new Date().getTime()}`} className="deco-logo" alt="Naruto Logo" />
+
+        <WebcamView onResults={handleWebcamResults} currentSong={currentSong} />
+
+        {/* Decorative Sasuke & Naruto (Clipped inside webcam frame) */}
+        <img src={`/assets/sasuke.png?v=${new Date().getTime()}`} className="deco-sasuke" alt="" />
+        <img src={`/assets/naruto.png?v=${new Date().getTime()}`} className="deco-naruto" alt="" />
+
         
         {/* ── Jutsu Effect (Nested) ── */}
         {activeJutsu && (

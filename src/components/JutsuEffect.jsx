@@ -1,4 +1,7 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+
+const smokeImg = new Image();
+smokeImg.src = '/effects/smoke.png';
 
 /* ── Audio ──────────────────────────────────────── */
 const playSound = (type, audioCtx) => {
@@ -221,10 +224,10 @@ const renderKaton = (ctx, w, h, hand, t, particles) => {
   ctx.clearRect(0, 0, w, h);
   const cx = hand[9].x * w;
   const cy = hand[9].y * h;
-  // Fireball travels to the right (or center of screen)
-  const bx = cx + Math.min(t * 3, w * 0.6);
-  const by = cy;
-  const ballR = Math.min(40 + t * 0.5, 110);
+  // Fireball stays centered and expands
+  const bx = w / 2;
+  const by = h / 2;
+  const ballR = 40 + t * 1.5; // Expands more slowly now
 
   // Heat shimmer background
   const shimmer = ctx.createRadialGradient(bx, by, 0, bx, by, ballR * 3);
@@ -302,6 +305,12 @@ const renderShadow = (ctx, w, h, hand, t, clones) => {
     // Head
     ctx.beginPath(); ctx.arc(0, -40, 18, 0, Math.PI*2); ctx.fill();
     ctx.restore();
+
+    // Smoke effect from image
+    if (smokeImg.complete && progress < 0.8) {
+      ctx.globalAlpha = (1 - (progress / 0.8)) * 0.6;
+      ctx.drawImage(smokeImg, sx - 100, sy - 150, 200, 200);
+    }
   });
 
   // Swirling smoke rings
@@ -411,22 +420,71 @@ const renderClone = (ctx, w, h, t) => {
   });
 
   // Poof smoke clouds only for the 2 clones
-  if (t < 22) {
-    const smokeAlpha = (1 - t / 22);
+  if (t < 25) {
+    const smokeAlpha = (1 - t / 25);
+    ctx.globalAlpha = smokeAlpha;
     squad.forEach(member => {
       const sx = member.x + dw / 2;
       const sy = member.y + dh / 2;
-      ctx.fillStyle = `rgba(240,240,240,${0.7 * smokeAlpha})`;
-      for(let i=0; i<6; i++) {
+      for(let i=0; i<3; i++) {
         const ox = (Math.random()-0.5)*dw;
         const oy = (Math.random()-0.5)*dh;
-        ctx.beginPath();
-        ctx.arc(sx+ox, sy+oy, 30+Math.random()*30, 0, Math.PI*2);
-        ctx.fill();
+        const size = dw * (1.2 + Math.random() * 0.5);
+        if (smokeImg.complete) {
+          ctx.drawImage(smokeImg, sx + ox - size/2, sy + oy - size/2, size, size);
+        } else {
+          ctx.fillStyle = `rgba(240,240,240,0.8)`;
+          ctx.beginPath();
+          ctx.arc(sx+ox, sy+oy, 50, 0, Math.PI*2);
+          ctx.fill();
+        }
       }
     });
   }
 
+  ctx.globalAlpha = 1;
+};
+
+/* ── Summon (Kuchiyose) Canvas ──────────────────── */
+const summonsImages = {};
+const loadSummonImage = (name) => {
+  if (summonsImages[name]) return summonsImages[name];
+  const img = new Image();
+  img.src = `/characters/${name}.png`;
+  summonsImages[name] = img;
+  return img;
+};
+
+const renderSummon = (ctx, w, h, t, animalName) => {
+  ctx.clearRect(0, 0, w, h);
+  if (!animalName) return;
+  const img = loadSummonImage(animalName);
+
+  const progress = Math.min(t / 25, 1);
+  const dw = w * 0.6;
+  const dh = h * 0.9;
+  const x = -w * 0.05; // Further to the side
+  const y = h * 0.05;
+
+  // Poof effect
+  if (t < 30) {
+    const smokeAlpha = Math.max(0, 1 - t / 30);
+    ctx.globalAlpha = smokeAlpha;
+    ctx.fillStyle = 'rgba(240,240,240,0.95)';
+    for (let i = 0; i < 15; i++) {
+      const ox = x + dw / 2 + (Math.random() - 0.5) * dw * 0.8;
+      const oy = y + dh / 2 + (Math.random() - 0.5) * dh * 0.8;
+      ctx.beginPath();
+      ctx.arc(ox, oy, 50 + Math.random() * 50, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Draw animal image
+  if (img.complete && img.naturalWidth !== 0) {
+    ctx.globalAlpha = progress * 0.7; // Added transparency
+    ctx.drawImage(img, x, y, dw, dh);
+  }
   ctx.globalAlpha = 1;
 };
 
@@ -437,6 +495,16 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
   const tRef = useRef(0);
   const particlesRef = useRef([]);
   const clonesRef = useRef([]);
+  const [showCutIn, setShowCutIn] = useState(true);
+  const [summonedAnimal, setSummonedAnimal] = useState(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowCutIn(false), 1200);
+    if (jutsu.effectType === 'summon') {
+      setSummonedAnimal('gamapunta');
+    }
+    return () => clearTimeout(timer);
+  }, [jutsu]);
 
   const initParticles = useCallback((type, cx, cy) => {
     if (type === 'lightning') {
@@ -499,12 +567,13 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       else if (jutsu.effectType === 'fire') renderKaton(ctx, w, h, usedHand, t, particlesRef.current);
       else if (jutsu.effectType === 'shadow') renderShadow(ctx, w, h, usedHand, t, clonesRef.current);
       else if (jutsu.effectType === 'clone') renderClone(ctx, w, h, t);
+      else if (jutsu.effectType === 'summon') renderSummon(ctx, w, h, t, summonedAnimal);
 
       rafRef.current = requestAnimationFrame(loop);
     };
     loop();
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [jutsu, initParticles]); // Removed handLandmarks from dependencies
+  }, [jutsu, initParticles, summonedAnimal]); // Added summonedAnimal to dependencies
 
   if (!jutsu) return null;
 
@@ -523,11 +592,11 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, zIndex: 50, pointerEvents: 'none',
+      position: 'absolute', inset: 0, zIndex: 8, pointerEvents: 'none',
       background: bgMap[jutsu.effectType] || 'rgba(0,0,0,0.8)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       borderRadius: 'inherit',
-    }}>
+    }} className={jutsu.effectType === 'fire' || jutsu.effectType === 'lightning' ? 'shake-heavy' : ''}>
       <canvas
         ref={canvasRef}
         width={window.currentVideoElement?.videoWidth || 640} 
@@ -557,6 +626,16 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
           {jutsu.subtitle} — {jutsu.character}
         </div>
       </div>
+
+      {/* ── Cut-In Overlay ── */}
+      {showCutIn && (
+        <div className="cutin-overlay">
+          <div className="cutin-bg" style={{ background: `linear-gradient(45deg, transparent, ${jutsu.glowColor.replace('0.6','0.8')})` }}></div>
+          <img className="cutin-character" src={`/characters/${jutsu.imageId}.png`} alt="" onError={e => e.target.style.display='none'} />
+          <div className="cutin-text" style={{ color: jutsu.color }}>{jutsu.name}</div>
+        </div>
+      )}
+
       <button
         onClick={onComplete}
         style={{

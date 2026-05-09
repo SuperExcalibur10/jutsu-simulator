@@ -9,6 +9,7 @@ export const JUTSUS = {
     color: '#C084FC',
     glowColor: 'rgba(192,132,252,0.6)',
     kanji: '分身',
+    imageId: 'naruto_moltiplicazione',
   },
   CHIDORI: {
     id: 'CHIDORI',
@@ -20,6 +21,7 @@ export const JUTSUS = {
     color: '#38BDF8',
     glowColor: 'rgba(56,189,248,0.6)',
     kanji: '千鳥',
+    imageId: 'kakashi_mille_falchi',
   },
   RASENGAN: {
     id: 'RASENGAN',
@@ -31,6 +33,7 @@ export const JUTSUS = {
     color: '#F97316',
     glowColor: 'rgba(249,115,22,0.6)',
     kanji: '螺旋丸',
+    imageId: 'naruto_rasengan',
   },
   KATON: {
     id: 'KATON',
@@ -42,6 +45,7 @@ export const JUTSUS = {
     color: '#EF4444',
     glowColor: 'rgba(239,68,68,0.6)',
     kanji: '火遁',
+    imageId: 'sasuke_palla_di_fuoco',
   },
   KAGE_BUNSHIN: {
     id: 'KAGE_BUNSHIN',
@@ -53,6 +57,19 @@ export const JUTSUS = {
     color: '#A855F7',
     glowColor: 'rgba(168,85,247,0.6)',
     kanji: '影分身',
+    imageId: 'naruto_moltiplicazione',
+  },
+  KUCHIYOSE: {
+    id: 'KUCHIYOSE',
+    name: 'Kuchiyose no Jutsu',
+    subtitle: 'Tecnica del Richiamo',
+    character: 'Naruto · Jiraiya',
+    sequence: ['Cinghiale', 'Cane', 'Uccello', 'Scimmia', 'Ariete'],
+    effectType: 'summon',
+    color: '#10B981',
+    glowColor: 'rgba(16,185,129,0.6)',
+    kanji: '口寄せの術',
+    imageId: 'jiraya',
   },
 };
 
