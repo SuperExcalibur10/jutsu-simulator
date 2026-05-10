@@ -1,8 +1,8 @@
-// Calculate Euclidean distance between two vectors
 const euclideanDistance = (v1, v2) => {
   let sum = 0;
   for (let i = 0; i < v1.length; i++) {
-    sum += Math.pow(v1[i] - v2[i], 2);
+    const diff = v1[i] - v2[i];
+    sum += diff * diff;
   }
   return Math.sqrt(sum);
 };
@@ -19,11 +19,10 @@ export const extractFeatures = (handLandmarksArray) => {
   const wrist = landmarks[0];
   const middleBase = landmarks[9];
   
-  const scale = Math.sqrt(
-    Math.pow(wrist.x - middleBase.x, 2) + 
-    Math.pow(wrist.y - middleBase.y, 2) + 
-    Math.pow(wrist.z - middleBase.z, 2)
-  ) || 1;
+  const dx = wrist.x - middleBase.x;
+  const dy = wrist.y - middleBase.y;
+  const dz = wrist.z - middleBase.z;
+  const scale = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
 
   for (let i = 1; i < 21; i++) {
     const pt = landmarks[i];

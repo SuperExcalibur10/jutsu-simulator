@@ -143,7 +143,10 @@ const WebcamView = ({ onResults, currentSong }) => {
         
         if (canvasRef.current) {
           const canvas = canvasRef.current;
-          const ctx = canvas.getContext('2d', { alpha: true }); // Ottimizzazione context
+          const ctx = canvas.getContext('2d', { 
+            alpha: true, 
+            desynchronized: true // Suggerimento al browser per ridurre la latenza
+          });
           
           if (canvas.width !== videoRef.current.videoWidth) {
             canvas.width = videoRef.current.videoWidth;
@@ -154,15 +157,19 @@ const WebcamView = ({ onResults, currentSong }) => {
           
           if (results && results.landmarks && results.landmarks.length > 0) {
             ctx.fillStyle = '#3b82f6';
-            // Ottimizzazione: disegniamo solo i punti principali se necessario, 
-            // ma per ora manteniamo tutti con un loop più veloce
+            
+            // Disegniamo i punti in un unico batch
+            ctx.beginPath();
             for (const landmarks of results.landmarks) {
               for (const point of landmarks) {
-                ctx.beginPath();
-                ctx.arc(point.x * canvas.width, point.y * canvas.height, 3, 0, 2 * Math.PI);
-                ctx.fill();
+                const x = point.x * canvas.width;
+                const y = point.y * canvas.height;
+                ctx.moveTo(x + 3, y);
+                ctx.arc(x, y, 3, 0, 2 * Math.PI);
               }
             }
+            ctx.fill();
+            
             if (onResults) onResults(results);
           } else {
             if (onResults) onResults(null);

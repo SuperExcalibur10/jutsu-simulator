@@ -3,6 +3,12 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 const smokeImg = new Image();
 smokeImg.src = '/effects/smoke.png';
 
+const dragonImg = new Image();
+dragonImg.src = '/effects/drago acquatico.png';
+
+const susanooImg = new Image();
+susanooImg.src = '/effects/susanoo.png';
+
 /* ── Audio ──────────────────────────────────────── */
 const playSound = (type, audioCtx) => {
   try {
@@ -78,6 +84,30 @@ const playSound = (type, audioCtx) => {
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
       osc.connect(gain); gain.connect(audioCtx.destination);
       osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+    } else if (type === 'heal') {
+      // Shosen Jutsu: Resonant healing hum
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.5);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + 2);
+
+      // Add a shimmering pulse
+      for(let i=0; i<3; i++) {
+        setTimeout(() => {
+          const osc2 = audioCtx.createOscillator();
+          const g2 = audioCtx.createGain();
+          osc2.frequency.setValueAtTime(1000 + Math.random()*500, audioCtx.currentTime);
+          g2.gain.setValueAtTime(0.1, audioCtx.currentTime);
+          g2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+          osc2.connect(g2); g2.connect(audioCtx.destination);
+          osc2.start(); osc2.stop(audioCtx.currentTime + 0.3);
+        }, 200 + i * 300);
+      }
     }
   } catch (e) { /* ignore */ }
 };
@@ -130,18 +160,22 @@ const renderChidori = (ctx, w, h, hand, t, particles) => {
   ctx.fillStyle = tipGlow;
   ctx.beginPath(); ctx.arc(tx, ty, 40, 0, Math.PI * 2); ctx.fill();
 
-  // Spark particles
-  particles.forEach((p, i) => {
+  // Spark particles - optimized loop
+  ctx.shadowBlur = 4; ctx.shadowColor = '#38BDF8'; // Set once before loop
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
     ctx.globalAlpha = p.life;
     ctx.fillStyle = p.color;
-    ctx.shadowBlur = 8; ctx.shadowColor = '#38BDF8';
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); 
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); 
+    ctx.fill();
+    
     p.x += p.vx; p.y += p.vy;
     p.vy += 0.1; p.life -= 0.025; p.size *= 0.97;
     if (p.life <= 0) {
       particles[i] = spawnSpark(cx, cy, tx, ty);
     }
-  });
+  }
   ctx.globalAlpha = 1; ctx.shadowBlur = 0;
 };
 
@@ -199,23 +233,37 @@ const renderRasengan = (ctx, w, h, hand, t, particles) => {
   ctx.fillStyle = core;
   ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
 
-  // Wind particles spiraling in
+  // Wind particles spiraling in - optimized loop
   ctx.shadowBlur = 0;
-  particles.forEach((p, i) => {
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
     ctx.globalAlpha = p.life * 0.7;
     ctx.fillStyle = p.color;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
-    const angle = Math.atan2(cy - p.y, cx - p.x);
-    const dist = Math.hypot(p.x - cx, p.y - cy);
+    ctx.beginPath(); 
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); 
+    ctx.fill();
+    
+    const dx = cx - p.x;
+    const dy = cy - p.y;
+    const angle = Math.atan2(dy, dx);
+    const distSq = dx * dx + dy * dy;
+    
     p.x += Math.cos(angle + 0.3) * 3;
     p.y += Math.sin(angle + 0.3) * 3;
     p.life -= 0.015;
-    if (p.life <= 0 || dist < radius * 0.5) {
+    
+    if (p.life <= 0 || distSq < (radius * 0.5) * (radius * 0.5)) {
       const a = Math.random() * Math.PI * 2;
       const d = radius * 1.5 + Math.random() * 80;
-      particles[i] = { x: cx + Math.cos(a)*d, y: cy + Math.sin(a)*d, life: 0.8, size: Math.random()*3+1, color: Math.random()>0.5?'#a0d8ff':'#fff' };
+      particles[i] = { 
+        x: cx + Math.cos(a) * d, 
+        y: cy + Math.sin(a) * d, 
+        life: 0.8, 
+        size: Math.random() * 3 + 1, 
+        color: Math.random() > 0.5 ? '#a0d8ff' : '#fff' 
+      };
     }
-  });
+  }
   ctx.globalAlpha = 1;
 };
 
@@ -254,12 +302,16 @@ const renderKaton = (ctx, w, h, hand, t, particles) => {
   ctx.beginPath(); ctx.arc(bx, by, ballR, 0, Math.PI*2); ctx.fill();
   ctx.shadowBlur = 0;
 
-  // Ember particles
-  particles.forEach((p, i) => {
+  // Ember particles - optimized loop
+  ctx.shadowBlur = 0; // Disable shadows for particles for major speedup
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
     ctx.globalAlpha = p.life;
     ctx.fillStyle = p.color;
-    ctx.shadowBlur = 6; ctx.shadowColor = p.color;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); 
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); 
+    ctx.fill();
+    
     p.x += p.vx; p.y += p.vy;
     p.vy -= 0.15; p.vx += (Math.random()-0.5)*0.3;
     p.life -= 0.018; p.size *= 0.98;
@@ -273,8 +325,165 @@ const renderKaton = (ctx, w, h, hand, t, particles) => {
         color: ['rgba(255,220,50,1)','rgba(255,120,20,1)','rgba(220,40,0,1)'][Math.floor(Math.random()*3)],
       };
     }
-  });
+  }
   ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+};
+
+const renderHeal = (ctx, w, h, hand, t, particles) => {
+  ctx.clearRect(0, 0, w, h);
+  const cx = hand[9].x * w, cy = hand[9].y * h;
+  const radius = 70 + Math.sin(t * 0.1) * 10;
+
+  // Background green glow
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 250);
+  bg.addColorStop(0, 'rgba(16,185,129,0.15)');
+  bg.addColorStop(1, 'transparent');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+
+  // Core hand glow
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+  core.addColorStop(0, 'rgba(255,255,255,0.8)');
+  core.addColorStop(0.4, 'rgba(16,185,129,0.6)');
+  core.addColorStop(1, 'transparent');
+  ctx.fillStyle = core;
+  ctx.shadowBlur = 30; ctx.shadowColor = '#10B981';
+  ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+
+  // Floating healing particles
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); 
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); 
+    ctx.fill();
+    
+    p.y -= p.speed; // Particles float UP
+    p.x += Math.sin(t * 0.05 + i) * 0.5;
+    p.life -= 0.01;
+    if (p.life <= 0) {
+      particles[i] = {
+        x: cx + (Math.random()-0.5)*120,
+        y: cy + (Math.random()-0.5)*120,
+        speed: 1 + Math.random() * 2,
+        life: 0.6 + Math.random() * 0.4,
+        size: 2 + Math.random() * 4,
+        color: Math.random() > 0.3 ? '#10B981' : '#fff'
+      };
+    }
+  }
+  ctx.globalAlpha = 1;
+};
+
+const renderWater = (ctx, w, h, frame, particles) => {
+  const video = window.currentVideoElement;
+  const cx = w / 2;
+  const cy = h / 2;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // 1. Draw Water Dragon statically in the background (same pattern as Susanoo)
+  ctx.save();
+  ctx.globalAlpha = 0.75;
+  ctx.translate(cx, cy + 50);
+  ctx.drawImage(dragonImg, -300, -350, 600, 700);
+  ctx.restore();
+
+  // 2. Draw water glow aura (between dragon and user)
+  const waterGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 300);
+  waterGlow.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
+  waterGlow.addColorStop(1, 'rgba(59, 130, 246, 0)');
+  ctx.fillStyle = waterGlow;
+  ctx.globalAlpha = 1;
+  ctx.fillRect(0, 0, w, h);
+
+  // Water particles
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); 
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); 
+    ctx.fill();
+    
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.2;
+    p.life -= 0.02;
+    if (p.life <= 0) {
+      particles[i] = {
+        x: cx + (Math.random()-0.5)*w, y: cy + (Math.random()-0.5)*h,
+        vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15 - 5,
+        life: Math.random()*0.8+0.2, size: Math.random()*10+5,
+        color: '#60a5fa'
+      };
+    }
+  }
+
+  // 3. Draw Segmented User on top (identical to Susanoo)
+  if (video && isSegmenting) {
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.drawImage(userCanvas, 0, 0, w, h);
+    ctx.restore();
+  }
+
+  ctx.globalAlpha = 1;
+};
+
+const renderSusanoo = (ctx, w, h, frame) => {
+  const video = window.currentVideoElement;
+  const segmenter = window.currentSegmenter;
+  const time = frame * 0.05;
+  const s = 1.1 + Math.sin(time) * 0.05;
+  const cx = w / 2;
+  const cy = h / 2;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // 1. Draw Susanoo in the background
+  ctx.save();
+  ctx.globalAlpha = 0.7 + Math.sin(time * 2) * 0.1;
+  ctx.translate(cx, cy + 50); // Slightly lower to look like it's rising
+  ctx.scale(s * 1.3, s * 1.3);
+  ctx.drawImage(susanooImg, -300, -350, 600, 700);
+  ctx.restore();
+
+  // 2. Draw Aura/Glow behind user but in front of Susanoo
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 300);
+  g.addColorStop(0, 'rgba(168, 85, 247, 0.2)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+
+  // 3. Draw Segmented User on top
+  if (video && segmenter && isSegmenting) {
+    ctx.save();
+    // No mirror here because canvasStyle handles it or it's already handled
+    ctx.drawImage(userCanvas, 0, 0, w, h);
+    ctx.restore();
+  }
+};
+
+const renderPush = (ctx, cx, cy, tx, ty, frame) => {
+  const progress = (frame % 30) / 30;
+  const radius = progress * 800;
+  
+  ctx.save();
+  ctx.lineWidth = 40 * (1 - progress);
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * (1 - progress)})`;
+  ctx.beginPath();
+  ctx.arc(tx, ty, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // Radial distortion-like glow
+  const g = ctx.createRadialGradient(tx, ty, radius * 0.8, tx, ty, radius);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(tx, ty, radius, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 };
 
 /* ── Kage Bunshin (Shadow) Canvas ───────────────── */
@@ -336,28 +545,7 @@ let userCanvas = null;
 let userCtx = null;
 let isSegmenting = false; // Flag to track if userCanvas has content
 
-const renderClone = (ctx, w, h, t) => {
-  ctx.clearRect(0, 0, w, h);
-  const video = window.currentVideoElement;
-  const segmenter = window.currentSegmenter;
-  
-  if (!video || video.readyState < 2) return;
-
-  const vW = video.videoWidth;
-  const vH = video.videoHeight;
-  
-  if (!maskCanvas || maskCanvas.width !== vW) {
-    maskCanvas = document.createElement('canvas');
-    maskCanvas.width = vW; maskCanvas.height = vH;
-    maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
-    
-    userCanvas = document.createElement('canvas');
-    userCanvas.width = vW; userCanvas.height = vH;
-    userCtx = userCanvas.getContext('2d', { willReadFrequently: true });
-    isSegmenting = false;
-  }
-
-  // Segment user to remove background
+const updateSegmentation = (video, segmenter, vW, vH) => {
   if (segmenter && video.currentTime !== video.dataset.lastTime) {
     video.dataset.lastTime = video.currentTime;
     try {
@@ -382,18 +570,32 @@ const renderClone = (ctx, w, h, t) => {
       console.error("Segmentation error:", e);
     }
   }
+};
+
+const renderClone = (ctx, w, h, t) => {
+  ctx.clearRect(0, 0, w, h);
+  const video = window.currentVideoElement;
+  const segmenter = window.currentSegmenter;
+  
+  if (!video || video.readyState < 2) return;
+  const vW = video.videoWidth, vH = video.videoHeight;
+  
+  if (!maskCanvas || maskCanvas.width !== vW) {
+    maskCanvas = document.createElement('canvas'); maskCanvas.width = vW; maskCanvas.height = vH;
+    maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+    userCanvas = document.createElement('canvas'); userCanvas.width = vW; userCanvas.height = vH;
+    userCtx = userCanvas.getContext('2d', { willReadFrequently: true });
+    isSegmenting = false;
+  }
+
+  updateSegmentation(video, segmenter, vW, vH);
 
   const progress = Math.min(t / 25, 1);
-  
-  // Use the segmented canvas ONLY if it has been populated, otherwise fallback to raw video
   const drawSource = isSegmenting ? userCanvas : video;
-  
-  // Clone dimensions (Portrait crop)
   const scale = 0.8;
   const dw = (w * 0.45) * scale;
   const dh = h * scale;
 
-  // Duo formation: [Left, Right] flank the center
   const squad = [
     { x: w * 0.02, y: h * 0.12, isReal: false, alpha: 0.85 },
     { x: w * 0.62, y: h * 0.12, isReal: false, alpha: 0.85 }
@@ -402,20 +604,12 @@ const renderClone = (ctx, w, h, t) => {
   squad.forEach((member) => {
     const memberAlpha = progress * member.alpha;
     ctx.globalAlpha = memberAlpha;
-
     ctx.save();
-    
-    // Mirroring logic
     ctx.translate(member.x + dw, member.y);
     ctx.scale(-1, 1);
-    
-    // Source cropping: take the center 50% of the webcam feed
     const srcX = vW * 0.25;
     const srcW = vW * 0.5;
-
-    // Draw the isolated user (segmented) as a clone
     ctx.drawImage(drawSource, srcX, 0, srcW, vH, 0, 0, dw, dh);
-
     ctx.restore();
   });
 
@@ -432,16 +626,10 @@ const renderClone = (ctx, w, h, t) => {
         const size = dw * (1.2 + Math.random() * 0.5);
         if (smokeImg.complete) {
           ctx.drawImage(smokeImg, sx + ox - size/2, sy + oy - size/2, size, size);
-        } else {
-          ctx.fillStyle = `rgba(240,240,240,0.8)`;
-          ctx.beginPath();
-          ctx.arc(sx+ox, sy+oy, 50, 0, Math.PI*2);
-          ctx.fill();
         }
       }
     });
   }
-
   ctx.globalAlpha = 1;
 };
 
@@ -493,6 +681,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
   const tRef = useRef(0);
+  const frameRef = useRef(0);
   const particlesRef = useRef([]);
   const clonesRef = useRef([]);
   const [showCutIn, setShowCutIn] = useState(true);
@@ -517,16 +706,34 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       });
     } else if (type === 'fire') {
       const colors = ['rgba(255,220,50,1)','rgba(255,120,20,1)','rgba(220,40,0,1)'];
-      particlesRef.current = Array.from({ length: 60 }, () => ({
+      particlesRef.current = Array.from({ length: 45 }, () => ({
         x: cx + (Math.random()-0.5)*40, y: cy + (Math.random()-0.5)*40,
         vx: (Math.random()-0.5)*6, vy: -(Math.random()*5+2),
         life: Math.random()*0.7+0.2, size: Math.random()*6+2,
         color: colors[Math.floor(Math.random()*colors.length)],
       }));
+    } else if (type === 'water') {
+      particlesRef.current = Array.from({ length: 40 }, () => ({
+        x: cx, y: cy,
+        vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10 - 5,
+        life: Math.random()*0.8+0.2, size: Math.random()*8+4,
+        color: '#3b82f6'
+      }));
+    } else if (type === 'susanoo') {
+      particlesRef.current = []; // Aura based rendering
     } else if (type === 'shadow') {
       clonesRef.current = [-200, -120, 120, 200].map(offset => ({
         x: cx + offset, y: cy,
         spawnTime: 30 + Math.abs(offset) * 0.3,
+      }));
+    } else if (type === 'heal') {
+      particlesRef.current = Array.from({ length: 35 }, () => ({
+        x: cx + (Math.random()-0.5)*100,
+        y: cy + (Math.random()-0.5)*100,
+        speed: 1 + Math.random() * 2,
+        life: Math.random(),
+        size: 2 + Math.random() * 4,
+        color: '#10B981'
       }));
     }
   }, []);
@@ -544,6 +751,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
     const ctx = canvas.getContext('2d');
     const w = canvas.width, h = canvas.height;
     tRef.current = 0;
+    frameRef.current = 0;
 
     // Use initial landmarks if available for starting position
     const initialHand = handLandmarks?.[0];
@@ -553,6 +761,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
 
     const loop = () => {
       tRef.current++;
+      frameRef.current++;
       const t = tRef.current;
       const liveHand = window.currentHandLandmarks?.[0];
       const usedHand = liveHand || initialHand || [{ x: 0.5, y: 0.5 }, ...Array(20).fill({ x: 0.5, y: 0.5 })];
@@ -562,18 +771,62 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
         return; 
       }
 
-      if (jutsu.effectType === 'lightning') renderChidori(ctx, w, h, usedHand, t, particlesRef.current);
-      else if (jutsu.effectType === 'wind') renderRasengan(ctx, w, h, usedHand, t, particlesRef.current);
-      else if (jutsu.effectType === 'fire') renderKaton(ctx, w, h, usedHand, t, particlesRef.current);
-      else if (jutsu.effectType === 'shadow') renderShadow(ctx, w, h, usedHand, t, clonesRef.current);
-      else if (jutsu.effectType === 'clone') renderClone(ctx, w, h, t);
-      else if (jutsu.effectType === 'summon') renderSummon(ctx, w, h, t, summonedAnimal);
+      const tx = usedHand[9].x * w;
+      const ty = usedHand[9].y * h;
+
+      switch(jutsu.effectType) {
+        case 'lightning': renderChidori(ctx, w, h, usedHand, t, particlesRef.current); break;
+        case 'wind': renderRasengan(ctx, w, h, usedHand, t, particlesRef.current); break;
+        case 'fire': renderKaton(ctx, w, h, usedHand, t, particlesRef.current); break;
+        case 'shadow': renderShadow(ctx, w, h, usedHand, t, clonesRef.current); break;
+        case 'clone': renderClone(ctx, w, h, t); break;
+        case 'summon': renderSummon(ctx, w, h, t, summonedAnimal); break;
+        case 'water': {
+          const waterVideo = window.currentVideoElement;
+          const waterSegmenter = window.currentSegmenter;
+          if (waterVideo && waterSegmenter) {
+             const vW = waterVideo.videoWidth, vH = waterVideo.videoHeight;
+             if (!maskCanvas || maskCanvas.width !== vW) {
+               maskCanvas = document.createElement('canvas'); maskCanvas.width = vW; maskCanvas.height = vH;
+               maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+               userCanvas = document.createElement('canvas'); userCanvas.width = vW; userCanvas.height = vH;
+               userCtx = userCanvas.getContext('2d', { willReadFrequently: true });
+               isSegmenting = false;
+             }
+             updateSegmentation(waterVideo, waterSegmenter, vW, vH);
+          }
+          renderWater(ctx, w, h, frameRef.current, particlesRef.current);
+          break;
+        }
+        case 'susanoo':
+          const video = window.currentVideoElement;
+          const segmenter = window.currentSegmenter;
+          if (video && segmenter) {
+             const vW = video.videoWidth, vH = video.videoHeight;
+             if (!maskCanvas || maskCanvas.width !== vW) {
+               maskCanvas = document.createElement('canvas'); maskCanvas.width = vW; maskCanvas.height = vH;
+               maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+               userCanvas = document.createElement('canvas'); userCanvas.width = vW; userCanvas.height = vH;
+               userCtx = userCanvas.getContext('2d', { willReadFrequently: true });
+               isSegmenting = false;
+             }
+             updateSegmentation(video, segmenter, vW, vH);
+          }
+          renderSusanoo(ctx, w, h, frameRef.current);
+          break;
+        case 'push':
+          renderPush(ctx, w/2, h/2, tx, ty, frameRef.current);
+          break;
+        case 'heal':
+          renderHeal(ctx, w, h, usedHand, t, particlesRef.current);
+          break;
+      }
 
       rafRef.current = requestAnimationFrame(loop);
     };
     loop();
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [jutsu, initParticles, summonedAnimal]); // Added summonedAnimal to dependencies
+  }, [jutsu, initParticles, summonedAnimal]);
 
   if (!jutsu) return null;
 

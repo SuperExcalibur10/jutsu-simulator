@@ -4,8 +4,17 @@ import JutsuEffect from './components/JutsuEffect';
 import { extractFeatures, classifySeal } from './utils/sealClassifier';
 import { JUTSUS, SEALS_LIST } from './utils/jutsuEngine';
 
-const SEAL_HOLD_FRAMES = 18; // ~600ms at 30fps before a seal is "confirmed"
+const SEAL_HOLD_FRAMES = 10; // Faster recognition
 const STORAGE_KEY_SEALS = 'jutsu_sim_v4_seals';
+const STORAGE_KEY_XP = 'jutsu_sim_v4_xp';
+
+const RANKS = [
+  { name: 'Accademia', min: 0, color: '#94A3B8' },
+  { name: 'Genin', min: 200, color: '#22C55E' },
+  { name: 'Chunin', min: 1000, color: '#3B82F6' },
+  { name: 'Jonin', min: 3000, color: '#A855F7' },
+  { name: 'Kage', min: 7000, color: '#F97316' }
+];
 
 const BACKGROUND_MUSIC = [
   { title: "Blue Bird", file: "/sounds/Blue Bird.mp3" },
@@ -20,6 +29,26 @@ function App() {
 
   // mode: 'jutsu-select' | 'calibration' | 'perform' | 'effect'
   const [mode, setMode] = useState('jutsu-select');
+  const [selectedForRecal, setSelectedForRecal] = useState(new Set());
+  const chakraFillRef = useRef(null);
+
+  /* ── Progression state ──────────────────────── */
+  const [totalXp, setTotalXp] = useState(0);
+  const [lastXpEarned, setLastXpEarned] = useState(0);
+  const [showXpPopup, setShowXpPopup] = useState(false);
+  const performanceStartTimeRef = useRef(0);
+
+  /* ── Battle state ───────────────────────────── */
+  const [battle, setBattle] = useState({
+    active: false,
+    enemy: null,
+    userHp: 100,
+    enemyHp: 100,
+    timer: 0,
+    status: '',
+    damageFlash: false
+  });
+  
   const [selectedJutsu, setSelectedJutsu] = useState(null);
   const selectedJutsuRef = useRef(null);
 
@@ -44,9 +73,6 @@ function App() {
   const [currentSong, setCurrentSong] = useState(null);
   const audioRef = useRef(new Audio());
   const musicStartedRef = useRef(false);
-
-  /* ── Recalibrate menu ───────────────────────── */
-  const [selectedForRecal, setSelectedForRecal] = useState(new Set());
 
   /* ── Keep refs in sync ──────────────────────── */
   useEffect(() => { calibratedSealsRef.current = calibratedSeals; }, [calibratedSeals]);
@@ -81,25 +107,36 @@ function App() {
       audioRef.current.src = '';
     };
   }, []);
-
-  /* ── Init: load saved calibration ──────────── */
+  /* ── Init: load saved data ──────────── */
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_SEALS);
-    if (saved) {
+    const savedSeals = localStorage.getItem(STORAGE_KEY_SEALS);
+    if (savedSeals) {
       try {
-        const parsed = JSON.parse(saved);
-        const firstKey = Object.keys(parsed)[0];
-        if (firstKey && parsed[firstKey] && parsed[firstKey].length !== 60) {
-          throw new Error('Obsolete format');
-        }
+        const parsed = JSON.parse(savedSeals);
         setCalibratedSeals(parsed);
         calibratedSealsRef.current = parsed;
-      } catch {
-        localStorage.removeItem(STORAGE_KEY_SEALS);
-      }
+      } catch (e) { localStorage.removeItem(STORAGE_KEY_SEALS); }
     }
+
+    const savedXp = localStorage.getItem(STORAGE_KEY_XP);
+    if (savedXp) setTotalXp(parseInt(savedXp, 10));
+
     setMode('jutsu-select');
   }, []);
+
+  const getCurrentRank = (xp) => {
+    for (let i = RANKS.length - 1; i >= 0; i--) {
+      if (xp >= RANKS[i].min) return RANKS[i];
+    }
+    return RANKS[0];
+  };
+
+  const getNextRank = (xp) => {
+    for (let i = 0; i < RANKS.length; i++) {
+      if (xp < RANKS[i].min) return RANKS[i];
+    }
+    return null;
+  };
 
   /* ── Jutsu selection ────────────────────────── */
   const handleSelectJutsu = (jutsu) => {
@@ -123,6 +160,7 @@ function App() {
     sealHoldCountRef.current = 0;
     setCurrentSeal(null);
     setStepFlash(false);
+    performanceStartTimeRef.current = performance.now();
     setMode('perform');
   };
 
@@ -202,12 +240,11 @@ function App() {
       if (recognized === targetSeal) {
         sealHoldCountRef.current++;
         const progress = Math.min((sealHoldCountRef.current / SEAL_HOLD_FRAMES) * 100, 100);
-        const fill = document.getElementById('chakra-fill');
-        if (fill) fill.style.width = `${progress}%`;
-
+        if (chakraFillRef.current) chakraFillRef.current.style.width = `${progress}%`;
+        
         if (sealHoldCountRef.current >= SEAL_HOLD_FRAMES) {
           sealHoldCountRef.current = 0;
-          if (fill) fill.style.width = '0%';
+          if (chakraFillRef.current) chakraFillRef.current.style.width = '0%';
           const nextStep = sequenceStepRef.current + 1;
           setStepFlash(true);
           setTimeout(() => setStepFlash(false), 500);
@@ -226,22 +263,159 @@ function App() {
       } else {
         if (sealHoldCountRef.current > 0) {
           sealHoldCountRef.current = 0;
-          const fill = document.getElementById('chakra-fill');
-          if (fill) fill.style.width = '0%';
+          if (chakraFillRef.current) chakraFillRef.current.style.width = '0%';
         }
       }
     }
   }, [mode]);
 
+  /* ── Battle Logic ───────────────────────────── */
+  const pickRandomJutsuForBattle = () => {
+    const unlocked = Object.values(JUTSUS).filter(j => totalXp >= (j.minXp || 0));
+    const random = unlocked[Math.floor(Math.random() * unlocked.length)];
+    setSelectedJutsu(random);
+    selectedJutsuRef.current = random;
+    
+    // Reset timer for the new command
+    setBattle(prev => ({ ...prev, timer: 12, status: `PRESTO! USA ${random.name}!` }));
+    
+    // Check if calibrated
+    const missing = random.sequence.filter(s => !calibratedSealsRef.current[s]);
+    if (missing.length > 0) {
+      setCalibrationQueue(missing);
+      setCalibrationIndex(0);
+      setMode('calibration');
+    } else {
+      // Start performance for this jutsu
+      setSequenceStep(0);
+      sequenceStepRef.current = 0;
+      sealHoldCountRef.current = 0;
+      performanceStartTimeRef.current = performance.now();
+      setMode('perform');
+    }
+  };
+
+  const startBattle = () => {
+    const enemies = [
+      { id: 'orochimaru', minXp: 0 },
+      { id: 'pain', minXp: 1000 },
+      { id: 'obito', minXp: 3000 },
+      { id: 'madara', minXp: 7000 },
+      { id: 'kaguya', minXp: 9000 }
+    ];
+    
+    // Filter enemies by player XP
+    const availableEnemies = enemies.filter(e => totalXp >= e.minXp);
+    const selectedEnemy = availableEnemies[Math.floor(Math.random() * availableEnemies.length)].id;
+    
+    setBattle({
+      active: true,
+      enemy: selectedEnemy,
+      userHp: 100,
+      enemyHp: 100,
+      timer: 12,
+      status: 'PREPARATI AL COMBATTIMENTO!',
+      damageFlash: false
+    });
+    
+    setMode('battle');
+  };
+
+  useEffect(() => {
+    if (battle.active && battle.timer > 0 && mode !== 'effect') {
+      const t = setInterval(() => {
+        setBattle(prev => {
+          if (prev.timer <= 1) {
+            // User takes damage!
+            const newHp = Math.max(0, prev.userHp - 20);
+            return { ...prev, timer: 12, userHp: newHp, status: 'COLPITO!', damageFlash: true };
+          }
+          return { ...prev, timer: prev.timer - 1, damageFlash: false };
+        });
+      }, 1000);
+      return () => clearInterval(t);
+    }
+  }, [battle.active, battle.timer, mode]);
+
+  useEffect(() => {
+    if (battle.active && battle.userHp <= 0) {
+      setBattle(prev => ({ ...prev, active: false, status: 'SCONFITTO...' }));
+      setMode('jutsu-select');
+      alert("Sei stato sconfitto! Torna ad allenarti.");
+    }
+    if (battle.active && battle.enemyHp <= 0) {
+      const bonus = 500;
+      setTotalXp(prev => {
+        const next = prev + bonus;
+        localStorage.setItem(STORAGE_KEY_XP, next.toString());
+        return next;
+      });
+      setLastXpEarned(bonus);
+      setShowXpPopup(true);
+      setBattle(prev => ({ ...prev, active: false, status: 'VITTORIA!' }));
+      setMode('jutsu-select');
+      setTimeout(() => setShowXpPopup(false), 3000);
+    }
+  }, [battle.userHp, battle.enemyHp, battle.active]);
+
   /* ── Jutsu complete ─────────────────────────── */
   const handleJutsuComplete = useCallback(() => {
+    // Calculate XP
+    const duration = (performance.now() - performanceStartTimeRef.current) / 1000;
+    const jutsu = selectedJutsuRef.current;
+    
+    if (jutsu) {
+      const base = 50 + (jutsu.sequence.length * 10);
+      const speedBonus = Math.max(1, 1.5 - (duration / 20));
+      const earned = Math.round(base * speedBonus);
+      
+      setTotalXp(prev => {
+        const next = prev + earned;
+        localStorage.setItem(STORAGE_KEY_XP, next.toString());
+        return next;
+      });
+      setLastXpEarned(earned);
+      setShowXpPopup(true);
+      setTimeout(() => setShowXpPopup(false), 3000);
+
+      // Battle Damage or Healing
+      setBattle(prev => {
+        if (prev.active) {
+          if (jutsu.effectType === 'heal') {
+            return {
+              ...prev,
+              userHp: Math.min(100, prev.userHp + 30),
+              timer: 12,
+              status: 'FERITE RIMARGINATE!'
+            };
+          } else {
+            return {
+              ...prev,
+              enemyHp: Math.max(0, prev.enemyHp - 25),
+              timer: 12,
+              status: 'OTTIMO COLPO!'
+            };
+          }
+        }
+        return prev;
+      });
+    }
+
     setActiveJutsu(null);
-    setMode('jutsu-select');
+    
+    // If in battle, pick the next move AUTOMATICALLY
+    if (battle.active) {
+       setTimeout(() => {
+         pickRandomJutsuForBattle();
+       }, 800); // Shorter pause for higher pace
+    }
+
+    setMode(battle.active ? 'battle' : 'jutsu-select');
     setSelectedJutsu(null);
     selectedJutsuRef.current = null;
     setSequenceStep(0);
     sequenceStepRef.current = 0;
-  }, []);
+  }, [battle.active]);
 
   /* ── Recalibration ──────────────────────────── */
   const toggleSeal = (name) => {
@@ -292,6 +466,89 @@ function App() {
           <div className="title-kanji">Shinobi Hand Seal Trainer</div>
         </div>
 
+        {/* ── Progression Widget ── */}
+        <div 
+          className="glass-panel" 
+          style={{ padding: '1rem', background: 'rgba(0,0,0,0.4)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+          onClick={(e) => {
+            const now = Date.now();
+            if (!window.rankClicks) window.rankClicks = [];
+            window.rankClicks = window.rankClicks.filter(t => now - t < 1000);
+            window.rankClicks.push(now);
+            if (window.rankClicks.length >= 3) {
+              setTotalXp(prev => {
+                const next = prev + 10000;
+                localStorage.setItem(STORAGE_KEY_XP, next.toString());
+                return next;
+              });
+              window.rankClicks = [];
+              alert("💥 CHAKRA ILLIMITATO! Hai ottenuto 10.000 XP.");
+            }
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.6rem' }}>
+            <div>
+              <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.1em' }}>Grado Ninja</div>
+              <div style={{ 
+                fontFamily: 'var(--font-title)', fontSize: '1.5rem', 
+                color: getCurrentRank(totalXp).color, 
+                textShadow: `0 0 10px ${getCurrentRank(totalXp).color}44` 
+              }}>
+                {getCurrentRank(totalXp).name}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Punti Esperienza</div>
+              <div style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1rem' }}>{totalXp} XP</div>
+            </div>
+          </div>
+          
+          {getNextRank(totalXp) && (
+            <>
+              <div className="calibration-progress" style={{ height: '6px', background: 'rgba(255,255,255,0.05)' }}>
+                <div 
+                  className="calibration-progress-fill" 
+                  style={{ 
+                    width: `${((totalXp - getCurrentRank(totalXp).min) / (getNextRank(totalXp).min - getCurrentRank(totalXp).min)) * 100}%`,
+                    background: getCurrentRank(totalXp).color
+                  }} 
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+                <span>{getCurrentRank(totalXp).min}</span>
+                <span>Prossimo Grado: {getNextRank(totalXp).name} ({getNextRank(totalXp).min})</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ─── BATTLE MODE ─── */}
+        {mode === 'battle' && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1.5rem', textAlign: 'center', animation: 'status-bounce 0.4s ease-out' }}>
+            <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+              <div style={{ fontSize: '0.7rem', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '0.5rem' }}>Scontro Ninja</div>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.8rem', color: '#fff' }}>SFIDA CONTRO {battle.enemy?.toUpperCase()}</div>
+            </div>
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
+              <img src={`/villain/${battle.enemy}.png`} alt="" style={{ height: '180px', filter: 'drop-shadow(0 0 15px rgba(239,68,68,0.4))' }} />
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                Il nemico è pronto ad attaccare. Reagisci velocemente alle tecniche che ti verranno ordinate!
+              </div>
+            </div>
+
+            <button className="ninja-btn primary" style={{ width: '100%', padding: '1.2rem', fontSize: '1.2rem' }}
+              onClick={pickRandomJutsuForBattle}>
+              ⚡ INIZIA LO SCONTRO
+            </button>
+            
+            <button className="ninja-btn" style={{ width: '100%' }}
+              onClick={() => { setBattle(prev => ({ ...prev, active: false })); setMode('jutsu-select'); }}>
+              🏳️ RITIRATI
+            </button>
+          </div>
+        )}
+
         {/* ─── JUTSU SELECT ─── */}
         {mode === 'jutsu-select' && (
           <>
@@ -302,59 +559,77 @@ function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {Object.values(JUTSUS).map(jutsu => {
                 const allCalibrated = jutsu.sequence.every(s => calibratedSeals[s]);
+                const isLocked = totalXp < (jutsu.minXp || 0);
+                
                 return (
                   <button
                     key={jutsu.id}
-                    className="jutsu-card-refined"
-                    onClick={() => handleSelectJutsu(jutsu)}
+                    className={`jutsu-card-refined ${isLocked ? 'locked' : ''}`}
+                    onClick={() => !isLocked && handleSelectJutsu(jutsu)}
                     style={{
-                      '--card-glow': jutsu.glowColor.replace('0.6','0.3'),
-                      background: `linear-gradient(135deg, ${jutsu.glowColor.replace('0.6','0.12')}, rgba(0,0,0,0.3))`,
-                      border: `1px solid ${jutsu.glowColor.replace('0.6','0.35')}`,
+                      '--card-glow': isLocked ? '#222' : jutsu.glowColor.replace('0.6','0.3'),
+                      background: isLocked ? 'rgba(0,0,0,0.5)' : `linear-gradient(135deg, ${jutsu.glowColor.replace('0.6','0.12')}, rgba(0,0,0,0.3))`,
+                      border: isLocked ? '1px solid rgba(255,255,255,0.05)' : `1px solid ${jutsu.glowColor.replace('0.6','0.35')}`,
                       borderRadius: '1rem', padding: '0.9rem 1rem',
-                      cursor: 'pointer', textAlign: 'left', color: 'var(--text-main)',
+                      cursor: isLocked ? 'not-allowed' : 'pointer', textAlign: 'left', color: isLocked ? '#666' : 'var(--text-main)',
                       position: 'relative', overflow: 'hidden',
-                      display: 'block', width: '100%'
+                      display: 'block', width: '100%',
+                      filter: isLocked ? 'grayscale(1)' : 'none',
+                      opacity: isLocked ? 0.7 : 1
                     }}
                   >
                     {/* Character background image */}
-                    <div style={{
-                      position: 'absolute', right: '0%', top: '50%', transform: 'translateY(-50%)', 
-                      height: '130%', width: '60%', opacity: 0.35, pointerEvents: 'none', 
-                      mixBlendMode: 'screen', filter: 'grayscale(30%)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}>
-                      <img src={`/characters/${jutsu.imageId}.png`} alt="" style={{ height: '100%', objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
-                    </div>
+                    {!isLocked && (
+                      <div style={{
+                        position: 'absolute', right: '0%', top: '50%', transform: 'translateY(-50%)', 
+                        height: '130%', width: '60%', opacity: 0.35, pointerEvents: 'none', 
+                        mixBlendMode: 'screen', filter: 'grayscale(30%)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <img src={`/characters/${jutsu.imageId}.png`} alt="" style={{ height: '100%', objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', letterSpacing: '0.08em', color: jutsu.color }}>
+                      <div style={{ zIndex: 2 }}>
+                        <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', letterSpacing: '0.08em', color: isLocked ? '#777' : jutsu.color }}>
                           {jutsu.name}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>{jutsu.subtitle}</div>
+                        <div style={{ fontSize: '0.72rem', color: isLocked ? '#555' : 'var(--text-muted)', marginTop: '0.1rem' }}>{jutsu.subtitle}</div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
-                        <span style={{ fontSize: '1.5rem', opacity: 0.5 }}>{jutsu.kanji}</span>
-                        {!allCalibrated && (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem', zIndex: 2 }}>
+                        <span style={{ fontSize: '1.5rem', opacity: isLocked ? 0.2 : 0.5 }}>{jutsu.kanji}</span>
+                        {isLocked ? (
+                          <span style={{ fontSize: '0.6rem', color: '#999', background: 'rgba(255,255,255,0.05)', padding: '0.1rem 0.4rem', borderRadius: '0.3rem', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            🔒 Sblocca a {jutsu.minXp} XP
+                          </span>
+                        ) : !allCalibrated && (
                           <span style={{ fontSize: '0.6rem', color: '#F97316', background: 'rgba(249,115,22,0.15)', padding: '0.1rem 0.4rem', borderRadius: '0.3rem', border: '1px solid rgba(249,115,22,0.3)' }}>
                             ⚡ Calibra
                           </span>
                         )}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                      {jutsu.sequence.map(s => (
-                        <span key={s} style={{
-                          fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '0.35rem',
-                          background: calibratedSeals[s] ? `${jutsu.glowColor.replace('0.6','0.2')}` : 'rgba(255,255,255,0.05)',
-                          border: `1px solid ${calibratedSeals[s] ? jutsu.glowColor.replace('0.6','0.4') : 'rgba(255,255,255,0.08)'}`,
-                          color: calibratedSeals[s] ? jutsu.color : 'var(--text-muted)',
-                        }}>{s}</span>
-                      ))}
-                    </div>
+                    
+                    {!isLocked && (
+                      <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                        {jutsu.sequence.map(s => (
+                          <span key={s} style={{
+                            fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '0.35rem',
+                            background: calibratedSeals[s] ? `${jutsu.glowColor.replace('0.6','0.2')}` : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${calibratedSeals[s] ? jutsu.glowColor.replace('0.6','0.4') : 'rgba(255,255,255,0.08)'}`,
+                            color: calibratedSeals[s] ? jutsu.color : 'var(--text-muted)',
+                          }}>{s}</span>
+                        ))}
+                      </div>
+                    )}
                   </button>
                 );
               })}
+              <button className="ninja-btn primary" style={{ width: '100%', padding: '0.8rem', fontSize: '1.1rem' }}
+                onClick={startBattle} disabled={battle.active}>
+                ⚔️ SCONTRO NINJA
+              </button>
             </div>
 
             <button className="ninja-btn danger" style={{ width: '100%', marginTop: 'auto' }}
@@ -441,6 +716,16 @@ function App() {
         {/* ─── PERFORM (guided sequence) ─── */}
         {mode === 'perform' && selectedJutsu && (
           <>
+            {battle.active && (
+              <div style={{ 
+                background: '#ef4444', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', 
+                padding: '0.3rem 0.8rem', borderRadius: '2rem', textAlign: 'center',
+                textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '0.8rem',
+                animation: 'pulse-glow 1s infinite'
+              }}>
+                ⚡ COMANDO DI BATTAGLIA ⚡
+              </div>
+            )}
             <div style={{
               padding: '0.85rem', borderRadius: '0.75rem', textAlign: 'center',
               background: `linear-gradient(135deg, ${selectedJutsu.glowColor.replace('0.6','0.15')}, rgba(0,0,0,0.3))`,
@@ -462,7 +747,7 @@ function App() {
                 {currentSeal || '· · ·'}
               </div>
               <div className="chakra-gauge-container">
-                <div id="chakra-fill" className="chakra-gauge-fill" />
+                <div ref={chakraFillRef} className="chakra-gauge-fill" />
               </div>
             </div>
 
@@ -541,7 +826,51 @@ function App() {
       </div>
 
       {/* ── Webcam ───────────────────────────── */}
-      <div className="glass-panel webcam-container" style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      <div className={`glass-panel webcam-container ${battle.damageFlash ? 'damage-flash' : ''}`} style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        
+        {/* Battle UI Overlay */}
+        {battle.active && (
+          <>
+            {/* Enemy HP Bar */}
+            <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', width: '60%', zIndex: 100 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#fff', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                <span>{battle.enemy}</span>
+                <span>{battle.enemyHp}%</span>
+              </div>
+              <div className="calibration-progress" style={{ height: '10px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                <div className="calibration-progress-fill" style={{ width: `${battle.enemyHp}%`, background: 'linear-gradient(90deg, #ef4444, #b91c1c)' }} />
+              </div>
+            </div>
+
+            {/* User HP Bar */}
+            <div style={{ position: 'absolute', bottom: '100px', left: '50%', transform: 'translateX(-50%)', width: '50%', zIndex: 100 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#fff', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                <span>Tu (Salute)</span>
+                <span>{battle.userHp}%</span>
+              </div>
+              <div className="calibration-progress" style={{ height: '8px', background: 'rgba(0,0,0,0.6)' }}>
+                <div className="calibration-progress-fill" style={{ width: `${battle.userHp}%`, background: 'linear-gradient(90deg, #22c55e, #15803d)' }} />
+              </div>
+            </div>
+
+            {/* Battle Timer & Status */}
+            <div style={{ position: 'absolute', top: '50%', right: '40px', transform: 'translateY(-50%)', textAlign: 'right', zIndex: 100 }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Tempo rimasto</div>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: '4rem', color: battle.timer <= 3 ? '#ef4444' : '#fff', lineHeight: 1 }}>
+                {battle.timer}
+              </div>
+              <div style={{ marginTop: '1rem', fontFamily: 'var(--font-title)', fontSize: '1.2rem', color: 'var(--naruto-orange)' }}>
+                {battle.status}
+              </div>
+            </div>
+
+            {/* Enemy Image Overlay */}
+            <div style={{ position: 'absolute', top: '15%', left: '30px', zIndex: 20, opacity: 0.85, filter: 'drop-shadow(0 0 20px rgba(0,0,0,0.5))' }}>
+              <img src={`/villain/${battle.enemy}.png`} alt="" style={{ height: '240px', objectFit: 'contain' }} />
+            </div>
+          </>
+        )}
+
         {/* Naruto Logo (Now inside webcam) */}
         <img src={`/assets/naruto_logo.png?v=${new Date().getTime()}`} className="deco-logo" alt="Naruto Logo" />
 
@@ -559,6 +888,14 @@ function App() {
             handLandmarks={window.currentHandLandmarks}
             onComplete={handleJutsuComplete}
           />
+        )}
+
+        {/* ── XP Popup ── */}
+        {showXpPopup && (
+          <div className="xp-popup">
+            <div className="xp-popup-title">TECNICA COMPLETATA!</div>
+            <div className="xp-popup-value">+{lastXpEarned} XP</div>
+          </div>
         )}
       </div>
 
