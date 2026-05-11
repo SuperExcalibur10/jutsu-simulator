@@ -11,27 +11,30 @@ const euclideanDistance = (v1, v2) => {
 export const extractFeatures = (handLandmarksArray) => {
   if (!handLandmarksArray || handLandmarksArray.length === 0) return null;
 
-  // Prendi solo la prima mano rilevata per supportare i sigilli a una mano
-  const landmarks = handLandmarksArray[0];
-  if (!landmarks) return null;
+  let allFeatures = [];
 
-  let features = [];
-  const wrist = landmarks[0];
-  const middleBase = landmarks[9];
-  
-  const dx = wrist.x - middleBase.x;
-  const dy = wrist.y - middleBase.y;
-  const dz = wrist.z - middleBase.z;
-  const scale = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+  // Support up to 2 hands for complex seals
+  for (let h = 0; h < Math.min(handLandmarksArray.length, 2); h++) {
+    const landmarks = handLandmarksArray[h];
+    if (!landmarks) continue;
 
-  for (let i = 1; i < 21; i++) {
-    const pt = landmarks[i];
-    features.push((pt.x - wrist.x) / scale);
-    features.push((pt.y - wrist.y) / scale);
-    features.push((pt.z - wrist.z) / scale);
+    const wrist = landmarks[0];
+    const middleBase = landmarks[9];
+    
+    const dx = wrist.x - middleBase.x;
+    const dy = wrist.y - middleBase.y;
+    const dz = wrist.z - middleBase.z;
+    const scale = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+
+    for (let i = 1; i < 21; i++) {
+      const pt = landmarks[i];
+      allFeatures.push((pt.x - wrist.x) / scale);
+      allFeatures.push((pt.y - wrist.y) / scale);
+      allFeatures.push((pt.z - wrist.z) / scale);
+    }
   }
   
-  return features;
+  return allFeatures;
 };
 
 export const classifySeal = (currentFeatures, calibratedSeals, threshold = 0.45) => {

@@ -4,14 +4,15 @@ import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCVPGJeGc69Ae9dbhbyG0GQTvoicuJmMGQ",
-  authDomain: "jutsu-simulator.firebaseapp.com",
-  projectId: "jutsu-simulator",
-  storageBucket: "jutsu-simulator.firebasestorage.app",
-  messagingSenderId: "283508932353",
-  appId: "1:283508932353:web:18ea3888ffaf561d79e500",
-  measurementId: "G-5NLNYSLKRW"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

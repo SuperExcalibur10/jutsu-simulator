@@ -540,6 +540,9 @@ function App() {
           className="glass-panel" 
           style={{ padding: '1rem', background: 'rgba(0,0,0,0.4)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
           onClick={(e) => {
+            const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
+            if (!user || user.email !== ADMIN_EMAIL) return;
+
             const now = Date.now();
             if (!window.rankClicks) window.rankClicks = [];
             window.rankClicks = window.rankClicks.filter(t => now - t < 1000);
@@ -548,10 +551,11 @@ function App() {
               setTotalXp(prev => {
                 const next = prev + 10000;
                 localStorage.setItem(STORAGE_KEY_XP, next.toString());
+                syncXpToCloud(next);
                 return next;
               });
               window.rankClicks = [];
-              alert("💥 CHAKRA ILLIMITATO! Hai ottenuto 10.000 XP.");
+              alert("💥 ADMIN CHAKRA! Hai ottenuto 10.000 XP.");
             }
           }}
         >
