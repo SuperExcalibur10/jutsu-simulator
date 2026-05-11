@@ -388,7 +388,18 @@ function App() {
 
   /* ── Battle Logic ───────────────────────────── */
   const pickRandomJutsuForBattle = useCallback(() => {
-    const unlocked = Object.values(JUTSUS).filter(j => totalXp >= (j.minXp || 0));
+    const allUnlocked = Object.values(JUTSUS).filter(j => totalXp >= (j.minXp || 0));
+    
+    // Prioritize jutsus that have already been fully calibrated to prevent battle flow interruption
+    let unlocked = allUnlocked.filter(j => 
+      j.sequence.every(s => calibratedSealsRef.current[s])
+    );
+    
+    // Fallback if no fully calibrated jutsus are available
+    if (unlocked.length === 0) {
+      unlocked = allUnlocked;
+    }
+    
     const random = unlocked[Math.floor(Math.random() * unlocked.length)];
     setSelectedJutsu(random);
     selectedJutsuRef.current = random;

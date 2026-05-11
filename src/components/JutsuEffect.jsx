@@ -478,10 +478,25 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
   }, []);
 
   useEffect(() => {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    playSound(jutsu.effectType, audioCtx);
-    const timeout = setTimeout(onComplete, 6000);
-    return () => { clearTimeout(timeout); audioCtx.close(); if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    let audioCtx = null;
+    let timeout = null;
+    
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      playSound(jutsu.effectType, audioCtx);
+    } catch (e) {
+      console.warn("AudioContext error:", e);
+    }
+    
+    timeout = setTimeout(onComplete, 6000);
+    
+    return () => { 
+      clearTimeout(timeout); 
+      if (audioCtx) {
+        try { audioCtx.close(); } catch(e){}
+      }
+      if (rafRef.current) cancelAnimationFrame(rafRef.current); 
+    };
   }, [jutsu, onComplete]);
 
   useEffect(() => {
