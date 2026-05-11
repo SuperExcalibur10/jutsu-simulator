@@ -221,7 +221,6 @@ function App() {
     }
   };
 
-  /* ── Deleted getNextRank and getCurrentRank from here ── */
 
   /* ── Jutsu selection ────────────────────────── */
   const handleSelectJutsu = (jutsu) => {

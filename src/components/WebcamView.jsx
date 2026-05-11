@@ -81,7 +81,9 @@ const WebcamView = ({ onResults, currentSong }) => {
   useEffect(() => {
     const getDevices = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { frameRate: { ideal: 120, max: 120 } } 
+        });
         const allDevices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = allDevices.filter(d => d.kind === 'videoinput');
         
@@ -107,7 +109,10 @@ const WebcamView = ({ onResults, currentSong }) => {
     const startCamera = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { deviceId: { exact: selectedDeviceId } }
+          video: { 
+            deviceId: { exact: selectedDeviceId },
+            frameRate: { ideal: 120, max: 120 }
+          }
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
