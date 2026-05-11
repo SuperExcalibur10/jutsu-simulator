@@ -1,12 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-
-const LEGENDARY_NINJAS = [
-  { name: 'Hashirama Senju', xp: 15000, rank: 'Hokage', avatar: '🍃' },
-  { name: 'Madara Uchiha', xp: 14500, rank: 'Leggenda', avatar: '🔥' },
-  { name: 'Minato Namikaze', xp: 12000, rank: 'Lampo Giallo', avatar: '⚡' },
-];
 
 const Leaderboard = ({ currentPlayer, onBack }) => {
   const [realPlayers, setRealPlayers] = useState([]);
@@ -25,23 +19,28 @@ const Leaderboard = ({ currentPlayer, onBack }) => {
     return () => unsubscribe();
   }, []);
 
-  // Combine legendary ninjas with real players
-  const allPlayers = [...LEGENDARY_NINJAS];
-  
-  realPlayers.forEach(rp => {
-    const existingIndex = allPlayers.findIndex(p => p.name === rp.name);
-    if (existingIndex === -1) {
-      allPlayers.push({
-        name: rp.name,
-        xp: rp.xp,
-        rank: rp.rank,
-        avatar: rp.photo || '🥷',
-        isCurrent: rp.id === currentPlayer?.uid
-      });
-    }
-  });
+  // Process and sort real players
+  const allPlayers = realPlayers.map(rp => ({
+    id: rp.id,
+    name: rp.name,
+    xp: rp.xp,
+    rank: rp.rank,
+    avatar: rp.photo || '🥷',
+    isCurrent: rp.id === currentPlayer?.uid
+  }));
 
-  // Sort by XP
+  // Assicuriamoci che il giocatore corrente sia sempre visibile, anche se non in top 20
+  if (currentPlayer && currentPlayer.uid && !allPlayers.some(p => p.id === currentPlayer.uid)) {
+    allPlayers.push({
+      id: currentPlayer.uid,
+      name: currentPlayer.name,
+      xp: currentPlayer.xp,
+      rank: currentPlayer.rank,
+      avatar: currentPlayer.photo || '🥷',
+      isCurrent: true
+    });
+  }
+
   const sortedPlayers = allPlayers.sort((a, b) => b.xp - a.xp);
 
   return (
@@ -58,7 +57,7 @@ const Leaderboard = ({ currentPlayer, onBack }) => {
         <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }} className="sidebar">
           {sortedPlayers.map((player, index) => (
             <div 
-              key={player.name}
+              key={player.id || player.name + index}
               style={{
                 display: 'flex',
                 alignItems: 'center',

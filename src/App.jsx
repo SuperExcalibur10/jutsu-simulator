@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
 import WebcamView from './components/WebcamView';
 import JutsuEffect from './components/JutsuEffect';
 import Leaderboard from './components/Leaderboard';
@@ -6,19 +7,12 @@ import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { extractFeatures, classifySeal } from './utils/sealClassifier';
 import { JUTSUS, SEALS_LIST } from './utils/jutsuEngine';
+import { RANKS, getCurrentRank, getNextRank } from './utils/progression';
 
 const SEAL_HOLD_FRAMES = 10; // Faster recognition
 const STORAGE_KEY_SEALS = 'jutsu_sim_v4_seals';
 const STORAGE_KEY_XP = 'jutsu_sim_v4_xp';
 const STORAGE_KEY_NAME = 'jutsu_sim_v4_name';
-
-const RANKS = [
-  { name: 'Accademia', min: 0, color: '#94A3B8' },
-  { name: 'Genin', min: 200, color: '#22C55E' },
-  { name: 'Chunin', min: 1000, color: '#3B82F6' },
-  { name: 'Jonin', min: 3000, color: '#A855F7' },
-  { name: 'Kage', min: 7000, color: '#F97316' }
-];
 
 const BACKGROUND_MUSIC = [
   { title: "Blue Bird", file: "/sounds/Blue Bird.mp3" },
@@ -30,6 +24,7 @@ function App() {
   /* ── Core state ─────────────────────────────── */
   const [calibratedSeals, setCalibratedSeals] = useState({});
   const calibratedSealsRef = useRef({});
+  const currentFeaturesBufferRef = useRef(null);
 
   // mode: 'jutsu-select' | 'calibration' | 'perform' | 'effect'
   const [mode, setMode] = useState('jutsu-select');
@@ -38,11 +33,15 @@ function App() {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [selectedForRecal, setSelectedForRecal] = useState(new Set());
   const chakraFillRef = useRef(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   /* ── Progression state ──────────────────────── */
   const [totalXp, setTotalXp] = useState(0);
   const [lastXpEarned, setLastXpEarned] = useState(0);
   const [showXpPopup, setShowXpPopup] = useState(false);
+  const [xpPopupTitle, setXpPopupTitle] = useState('TECNICA COMPLETATA!');
   const performanceStartTimeRef = useRef(0);
 
   /* ── Battle state ───────────────────────────── */
@@ -68,7 +67,6 @@ function App() {
 
   /* ── Performance (guided sequence) state ────── */
   const [sequenceStep, setSequenceStep] = useState(0);  // which seal in the sequence we're waiting for
-  const [currentSeal, setCurrentSeal] = useState(null); // currently detected seal
   const [stepFlash, setStepFlash] = useState(false);    // green flash when step confirmed
   const sealHoldCountRef = useRef(0);                   // consecutive frames same seal detected
   const sequenceStepRef = useRef(0);
@@ -126,39 +124,51 @@ function App() {
     }
 
     const savedXp = localStorage.getItem(STORAGE_KEY_XP);
-    if (savedXp) setTotalXp(parseInt(savedXp, 10));
+    if (savedXp) {
+      const parsedXp = parseInt(savedXp, 10);
+      setTimeout(() => setTotalXp(parsedXp), 0);
+    }
 
     // Firebase Auth Listener
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        setPlayerName(firebaseUser.displayName);
-        setShowLoginPrompt(false);
-        
-        // Sync with Firestore
-        const userRef = doc(db, 'players', firebaseUser.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists()) {
-          const cloudXp = userSnap.data().xp || 0;
-          if (cloudXp > (parseInt(savedXp, 10) || 0)) {
+      try {
+        if (firebaseUser) {
+          setUser(firebaseUser);
+          setPlayerName(firebaseUser.displayName);
+          setShowLoginPrompt(false);
+          
+          // Sync with Firestore
+          const userRef = doc(db, 'players', firebaseUser.uid);
+          const userSnap = await getDoc(userRef);
+          
+          if (userSnap.exists()) {
+            const cloudData = userSnap.data();
+            const cloudXp = cloudData.xp || 0;
+            if (cloudData.name) {
+              setPlayerName(cloudData.name);
+            }
+            // Usa sempre i dati del cloud per gli account esistenti (previene ereditarietà tra account)
             setTotalXp(cloudXp);
             localStorage.setItem(STORAGE_KEY_XP, cloudXp.toString());
+          } else {
+            // Create user in Firestore
+            await setDoc(userRef, {
+              name: firebaseUser.displayName,
+              xp: parseInt(savedXp, 10) || 0,
+              rank: getCurrentRank(parseInt(savedXp, 10) || 0).name,
+              photo: firebaseUser.photoURL,
+              lastSeen: new Date()
+            });
           }
         } else {
-          // Create user in Firestore
-          await setDoc(userRef, {
-            name: firebaseUser.displayName,
-            xp: parseInt(savedXp, 10) || 0,
-            rank: getCurrentRank(parseInt(savedXp, 10) || 0).name,
-            photo: firebaseUser.photoURL,
-            lastSeen: new Date()
-          });
+          setUser(null);
+          setPlayerName('');
+          setShowLoginPrompt(true);
         }
-      } else {
-        setUser(null);
-        setPlayerName('');
-        setShowLoginPrompt(true);
+      } catch (error) {
+        console.error("Errore durante la sincronizzazione utente:", error);
+      } finally {
+        setIsAuthLoading(false);
       }
     });
 
@@ -166,45 +176,52 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
+  const handleLogin = useCallback(async () => {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed:", error);
       alert("Errore durante il login con Google. Riprova.");
     }
-  };
+  }, []);
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = useCallback(() => {
+    signOut(auth);
+    setTotalXp(0);
+    localStorage.removeItem(STORAGE_KEY_XP);
+  }, []);
 
-  const syncXpToCloud = async (newTotal) => {
+  const syncXpToCloud = useCallback(async (newTotal) => {
     if (user) {
       const userRef = doc(db, 'players', user.uid);
       try {
-        await updateDoc(userRef, {
+        await setDoc(userRef, {
           xp: newTotal,
           rank: getCurrentRank(newTotal).name,
           lastSeen: new Date()
-        });
+        }, { merge: true });
       } catch (e) {
         console.error("Cloud sync failed:", e);
       }
     }
+  }, [user]);
+
+  const handleSaveName = async () => {
+    if (!tempName || !user) return;
+    const sanitizedName = tempName.replace(/[^a-zA-Z0-9_ -]/g, '').trim().substring(0, 15);
+    if (!sanitizedName) return;
+    try {
+      const userRef = doc(db, 'players', user.uid);
+      await setDoc(userRef, { name: sanitizedName }, { merge: true });
+      setPlayerName(sanitizedName);
+      setIsEditingName(false);
+    } catch (e) {
+      console.error("Failed to update name:", e);
+      alert("Errore durante l'aggiornamento del nome.");
+    }
   };
 
-  const getCurrentRank = (xp) => {
-    for (let i = RANKS.length - 1; i >= 0; i--) {
-      if (xp >= RANKS[i].min) return RANKS[i];
-    }
-    return RANKS[0];
-  };
-
-  const getNextRank = (xp) => {
-    for (let i = 0; i < RANKS.length; i++) {
-      if (xp < RANKS[i].min) return RANKS[i];
-    }
-    return null;
-  };
+  /* ── Deleted getNextRank and getCurrentRank from here ── */
 
   /* ── Jutsu selection ────────────────────────── */
   const handleSelectJutsu = (jutsu) => {
@@ -226,15 +243,26 @@ function App() {
     setSequenceStep(step);
     sequenceStepRef.current = step;
     sealHoldCountRef.current = 0;
-    setCurrentSeal(null);
     setStepFlash(false);
     performanceStartTimeRef.current = performance.now();
+    
+    // Reset UI refs manually to ensure clean state
+    if (chakraFillRef.current) chakraFillRef.current.style.width = '0%';
+    const sealEl = document.getElementById('ui-current-seal-name');
+    if (sealEl) {
+      sealEl.innerText = '· · ·';
+      sealEl.style.color = 'var(--text-muted)';
+      sealEl.style.textShadow = 'none';
+    }
+    const progEl = document.getElementById('ui-seal-progress');
+    if (progEl) progEl.innerText = 'In attesa...';
+    
     setMode('perform');
   };
 
   /* ── Calibration ────────────────────────────── */
   const captureNow = useCallback(() => {
-    const features = window.currentFeaturesBuffer;
+    const features = currentFeaturesBufferRef.current;
     if (!features) { alert('Nessuna mano rilevata! Riprova.'); return; }
     const sealName = calibrationQueue[calibrationIndex];
     if (!sealName) return;
@@ -247,7 +275,7 @@ function App() {
     });
 
     setLastCaptured(true);
-    window.currentFeaturesBuffer = null;
+    currentFeaturesBufferRef.current = null;
     setTimeout(() => setLastCaptured(false), 600);
 
     if (calibrationIndex < calibrationQueue.length - 1) {
@@ -278,15 +306,23 @@ function App() {
         captureNowRef.current();
         setTimeout(() => { captureInProgressRef.current = false; }, 1000);
       }
-      setCountdown(null);
+      setTimeout(() => setCountdown(null), 0);
     }
-  }, [countdown]);
+  }, [countdown, captureNow]);
 
   /* ── Webcam results ─────────────────────────── */
   const handleWebcamResults = useCallback((results) => {
     if (!results?.landmarks?.length) {
-      setCurrentSeal(null);
       sealHoldCountRef.current = 0;
+      if (chakraFillRef.current) chakraFillRef.current.style.width = '0%';
+      const sealEl = document.getElementById('ui-current-seal-name');
+      if (sealEl) {
+        sealEl.innerText = '· · ·';
+        sealEl.style.color = 'var(--text-muted)';
+        sealEl.style.textShadow = 'none';
+      }
+      const progEl = document.getElementById('ui-seal-progress');
+      if (progEl) progEl.innerText = 'In attesa...';
       return;
     }
     const features = extractFeatures(results.landmarks);
@@ -294,7 +330,7 @@ function App() {
     if (!features) return;
 
     if (mode === 'calibration') {
-      window.currentFeaturesBuffer = features;
+      currentFeaturesBufferRef.current = features;
       return;
     }
 
@@ -303,16 +339,27 @@ function App() {
       if (!jutsu) return;
       const targetSeal = jutsu.sequence[sequenceStepRef.current];
       const recognized = classifySeal(features, calibratedSealsRef.current);
-      setCurrentSeal(recognized);
+      
+      const sealEl = document.getElementById('ui-current-seal-name');
+      if (sealEl) {
+        sealEl.innerText = recognized || '· · ·';
+        sealEl.style.color = recognized ? jutsu.color : 'var(--text-muted)';
+        sealEl.style.textShadow = recognized ? `0 0 12px ${jutsu.glowColor}` : 'none';
+      }
 
       if (recognized === targetSeal) {
         sealHoldCountRef.current++;
         const progress = Math.min((sealHoldCountRef.current / SEAL_HOLD_FRAMES) * 100, 100);
         if (chakraFillRef.current) chakraFillRef.current.style.width = `${progress}%`;
         
+        const progEl = document.getElementById('ui-seal-progress');
+        if (progEl) progEl.innerText = `✓ Tieni fermo... ${Math.round(progress)}%`;
+
         if (sealHoldCountRef.current >= SEAL_HOLD_FRAMES) {
           sealHoldCountRef.current = 0;
           if (chakraFillRef.current) chakraFillRef.current.style.width = '0%';
+          if (progEl) progEl.innerText = 'In attesa...';
+          
           const nextStep = sequenceStepRef.current + 1;
           setStepFlash(true);
           setTimeout(() => setStepFlash(false), 500);
@@ -332,13 +379,15 @@ function App() {
         if (sealHoldCountRef.current > 0) {
           sealHoldCountRef.current = 0;
           if (chakraFillRef.current) chakraFillRef.current.style.width = '0%';
+          const progEl = document.getElementById('ui-seal-progress');
+          if (progEl) progEl.innerText = 'In attesa...';
         }
       }
     }
   }, [mode]);
 
   /* ── Battle Logic ───────────────────────────── */
-  const pickRandomJutsuForBattle = () => {
+  const pickRandomJutsuForBattle = useCallback(() => {
     const unlocked = Object.values(JUTSUS).filter(j => totalXp >= (j.minXp || 0));
     const random = unlocked[Math.floor(Math.random() * unlocked.length)];
     setSelectedJutsu(random);
@@ -361,7 +410,7 @@ function App() {
       performanceStartTimeRef.current = performance.now();
       setMode('perform');
     }
-  };
+  }, [totalXp]);
 
   const startBattle = () => {
     const enemies = [
@@ -407,22 +456,28 @@ function App() {
 
   useEffect(() => {
     if (battle.active && battle.userHp <= 0) {
-      setBattle(prev => ({ ...prev, active: false, status: 'SCONFITTO...' }));
-      setMode('jutsu-select');
-      alert("Sei stato sconfitto! Torna ad allenarti.");
+      setTimeout(() => {
+        setBattle(prev => ({ ...prev, active: false, status: 'SCONFITTO...' }));
+        setMode('jutsu-select');
+        alert("Sei stato sconfitto! Torna ad allenarti.");
+      }, 0);
     }
     if (battle.active && battle.enemyHp <= 0) {
       const bonus = 500;
-      setTotalXp(prev => {
-        const next = prev + bonus;
-        localStorage.setItem(STORAGE_KEY_XP, next.toString());
-        return next;
-      });
-      setLastXpEarned(bonus);
-      setShowXpPopup(true);
-      setBattle(prev => ({ ...prev, active: false, status: 'VITTORIA!' }));
-      setMode('jutsu-select');
-      setTimeout(() => setShowXpPopup(false), 3000);
+      const defeatedEnemy = battle.enemy;
+      setTimeout(() => {
+        setTotalXp(prev => {
+          const next = prev + bonus;
+          localStorage.setItem(STORAGE_KEY_XP, next.toString());
+          return next;
+        });
+        setLastXpEarned(bonus);
+        setXpPopupTitle(`HAI SCONFITTO ${defeatedEnemy.toUpperCase()}!`);
+        setShowXpPopup(true);
+        setBattle(prev => ({ ...prev, active: false, status: 'VITTORIA!' }));
+        setMode('jutsu-select');
+        setTimeout(() => setShowXpPopup(false), 4000);
+      }, 500);
     }
   }, [battle.userHp, battle.enemyHp, battle.active]);
 
@@ -444,8 +499,12 @@ function App() {
         return next;
       });
       setLastXpEarned(earned);
+      setXpPopupTitle('TECNICA COMPLETATA!');
       setShowXpPopup(true);
       setTimeout(() => setShowXpPopup(false), 3000);
+
+      const newEnemyHp = Math.max(0, battle.enemyHp - 25);
+      const isEnemyDefeated = battle.active && jutsu.effectType !== 'heal' && newEnemyHp === 0;
 
       // Battle Damage or Healing
       setBattle(prev => {
@@ -460,7 +519,7 @@ function App() {
           } else {
             return {
               ...prev,
-              enemyHp: Math.max(0, prev.enemyHp - 25),
+              enemyHp: newEnemyHp,
               timer: 12,
               status: 'OTTIMO COLPO!'
             };
@@ -471,20 +530,20 @@ function App() {
     }
 
     setActiveJutsu(null);
-    
-    // If in battle, pick the next move AUTOMATICALLY
-    if (battle.active) {
-       setTimeout(() => {
-         pickRandomJutsuForBattle();
-       }, 800); // Shorter pause for higher pace
-    }
+      
+      // If in battle, pick the next move AUTOMATICALLY (only if enemy is not defeated)
+      if (battle.active && !isEnemyDefeated) {
+         setTimeout(() => {
+           pickRandomJutsuForBattle();
+         }, 800); // Shorter pause for higher pace
+      }
 
-    setMode(battle.active ? 'battle' : 'jutsu-select');
+      setMode(battle.active ? 'battle' : 'jutsu-select');
     setSelectedJutsu(null);
     selectedJutsuRef.current = null;
     setSequenceStep(0);
     sequenceStepRef.current = 0;
-  }, [battle.active]);
+  }, [battle.active, pickRandomJutsuForBattle, syncXpToCloud]);
 
   /* ── Recalibration ──────────────────────────── */
   const toggleSeal = (name) => {
@@ -534,6 +593,47 @@ function App() {
           <div className="title-main">忍術 Simulator</div>
           <div className="title-kanji">Shinobi Hand Seal Trainer</div>
         </div>
+
+        {/* Player Profile */}
+        {isAuthLoading ? (
+          <div className="glass-panel" style={{ padding: '0.8rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+             <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', animation: 'pulse-glow 1.5s infinite' }} />
+             <div style={{ flex: 1 }}>
+               <div style={{ width: '40px', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', marginBottom: '6px' }} />
+               <div style={{ width: '80px', height: '14px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }} />
+             </div>
+          </div>
+        ) : user && (
+          <div className="glass-panel" style={{ padding: '0.8rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: 1 }}>
+              {user.photoURL && <img src={user.photoURL} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)' }} referrerPolicy="no-referrer" />}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Shinobi</div>
+                {isEditingName ? (
+                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
+                    <input 
+                      autoFocus
+                      value={tempName}
+                      onChange={e => setTempName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+                      style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--naruto-orange)', color: '#fff', borderRadius: '0.3rem', padding: '0.2rem 0.4rem', fontSize: '0.9rem', width: '100%', outline: 'none' }}
+                      maxLength={15}
+                    />
+                    <button onClick={handleSaveName} style={{ background: 'var(--naruto-orange)', color: '#fff', border: 'none', borderRadius: '0.3rem', padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}>✓</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
+                    <span style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', color: '#fff' }}>{playerName}</span>
+                    <button onClick={() => { setTempName(playerName); setIsEditingName(true); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', padding: '0.1rem' }} title="Modifica Nome">✏️</button>
+                  </div>
+                )}
+              </div>
+            </div>
+            <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.2rem', padding: '0.5rem' }} title="Disconnetti">
+              🚪
+            </button>
+          </div>
+        )}
 
         {/* ── Progression Widget ── */}
         <div 
@@ -818,11 +918,11 @@ function App() {
             {/* Detected seal */}
             <div className="seal-detector">
               <div className="seal-detector-label">Sigillo Rilevato</div>
-              <div className="seal-detector-value" style={{
-                color: currentSeal ? selectedJutsu.color : 'var(--text-muted)',
-                textShadow: currentSeal ? `0 0 12px ${selectedJutsu.glowColor}` : 'none',
+              <div className="seal-detector-value" id="ui-current-seal-name" style={{
+                color: 'var(--text-muted)',
+                textShadow: 'none',
               }}>
-                {currentSeal || '· · ·'}
+                · · ·
               </div>
               <div className="chakra-gauge-container">
                 <div ref={chakraFillRef} className="chakra-gauge-fill" />
@@ -838,7 +938,7 @@ function App() {
                 {selectedJutsu.sequence.map((sealName, i) => {
                   const isDone = i < sequenceStep;
                   const isCurrent = i === sequenceStep;
-                  const isNext = i > sequenceStep;
+                  // const isNext = i > sequenceStep;
                   return (
                     <div key={i} style={{
                       display: 'flex', alignItems: 'center', gap: '0.75rem',
@@ -882,10 +982,8 @@ function App() {
                           {sealName}
                         </div>
                         {isCurrent && (
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                            {currentSeal === sealName
-                              ? `✓ Tieni fermo... ${Math.round((sealHoldCountRef.current / SEAL_HOLD_FRAMES) * 100)}%`
-                              : 'In attesa...'}
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }} id="ui-seal-progress">
+                            In attesa...
                           </div>
                         )}
                       </div>
@@ -971,7 +1069,7 @@ function App() {
         {/* ── XP Popup ── */}
         {showXpPopup && (
           <div className="xp-popup">
-            <div className="xp-popup-title">TECNICA COMPLETATA!</div>
+            <div className="xp-popup-title">{xpPopupTitle}</div>
             <div className="xp-popup-value">+{lastXpEarned} XP</div>
           </div>
         )}
@@ -1015,7 +1113,7 @@ function App() {
       {/* ── Leaderboard Overlay ── */}
       {mode === 'leaderboard' && (
         <Leaderboard 
-          currentPlayer={{ name: playerName, xp: totalXp, rank: getCurrentRank(totalXp).name }}
+          currentPlayer={{ uid: user?.uid, name: playerName, xp: totalXp, rank: getCurrentRank(totalXp).name, photo: user?.photoURL }}
           onBack={() => setMode('jutsu-select')}
         />
       )}

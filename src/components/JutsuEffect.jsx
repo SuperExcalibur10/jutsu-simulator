@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 
 const smokeImg = new Image();
 smokeImg.src = '/effects/smoke.png';
@@ -100,15 +100,14 @@ const playSound = (type, audioCtx) => {
         }, 200 + i * 300);
       }
     }
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
 };
 
 /* ── Helper Functions ──────────────────────────── */
-const spawnSpark = (cx, cy, tx, ty) => {
-  const t = Math.random();
+const spawnSpark = (_cx, _cy, tx, ty) => {
   return {
-    x: cx + (tx-cx)*t + (Math.random()-0.5)*40,
-    y: cy + (ty-cy)*t + (Math.random()-0.5)*40,
+    x: tx + (Math.random()-0.5)*40,
+    y: ty + (Math.random()-0.5)*40,
     vx: (Math.random()-0.5)*4,
     vy: (Math.random()-0.5)*4 - 1,
     life: Math.random()*0.6+0.3,
@@ -174,14 +173,14 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
             isSegmentingRef.current = true;
           }
         });
-      } catch (e) {
-        console.error("Segmentation error:", e);
+      } catch {
+        console.error("Segmentation error");
       }
     }
   }, []);
 
   /* ── Render Functions ──────────────────────────── */
-  const renderChidori = (ctx, w, h, hand, t, particles) => {
+  const renderChidori = useCallback((ctx, w, h, hand, t, particles) => {
     ctx.clearRect(0, 0, w, h);
     const cx = hand[9].x * w, cy = hand[9].y * h;
     const tip = hand[8];
@@ -202,13 +201,13 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       ctx.strokeStyle = i < 4 ? 'rgba(255,255,255,0.9)' : `rgba(100,190,255,${0.4 + Math.random() * 0.4})`;
       ctx.lineWidth = i < 4 ? 2 : 1;
       ctx.beginPath(); ctx.moveTo(cx + (Math.random()-0.5)*30, cy + (Math.random()-0.5)*30);
-      let x = cx, y = cy;
+      let _lx, _ly;
       const steps = 5 + Math.floor(Math.random() * 4);
       for (let j = 0; j < steps; j++) {
         const progress = j / steps;
-        x = cx + (tx - cx) * progress + (Math.random()-0.5) * 60 * (1-progress);
-        y = cy + (ty - cy) * progress + (Math.random()-0.5) * 60 * (1-progress);
-        ctx.lineTo(x, y);
+        _lx = cx + (tx - cx) * progress + (Math.random()-0.5) * 60 * (1-progress);
+        _ly = cy + (ty - cy) * progress + (Math.random()-0.5) * 60 * (1-progress);
+        ctx.lineTo(_lx, _ly);
       }
       ctx.lineTo(tx, ty);
       ctx.stroke();
@@ -229,9 +228,9 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       if (p.life <= 0) particles[i] = spawnSpark(cx, cy, tx, ty);
     }
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-  };
+  }, []);
 
-  const renderRasengan = (ctx, w, h, hand, t, particles) => {
+  const renderRasengan = useCallback((ctx, w, h, hand, t, particles) => {
     ctx.clearRect(0, 0, w, h);
     const cx = hand[9].x * w, cy = hand[9].y * h;
     const radius = 55 + 5 * Math.sin(t * 0.08);
@@ -277,9 +276,9 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       }
     }
     ctx.globalAlpha = 1;
-  };
+  }, []);
 
-  const renderKaton = (ctx, w, h, hand, t, particles) => {
+  const renderKaton = useCallback((ctx, w, h, hand, t, particles) => {
     ctx.clearRect(0, 0, w, h);
     const bx = w / 2, by = h / 2;
     const ballR = 40 + t * 1.5;
@@ -315,9 +314,9 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       }
     }
     ctx.globalAlpha = 1;
-  };
+  }, []);
 
-  const renderHeal = (ctx, w, h, hand, t, particles) => {
+  const renderHeal = useCallback((ctx, w, h, hand, t, particles) => {
     ctx.clearRect(0, 0, w, h);
     const cx = hand[9].x * w, cy = hand[9].y * h;
     const radius = 70 + Math.sin(t * 0.1) * 10;
@@ -337,9 +336,9 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       }
     }
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-  };
+  }, []);
 
-  const renderClone = (ctx, w, h, t) => {
+  const renderClone = useCallback((ctx, w, h, t) => {
     ctx.clearRect(0, 0, w, h);
     const video = window.currentVideoElement;
     const segmenter = window.currentSegmenter;
@@ -370,9 +369,9 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       });
     }
     ctx.globalAlpha = 1;
-  };
+  }, [updateSegmentation]);
 
-  const renderSummon = (ctx, w, h, t, animalName) => {
+  const renderSummon = useCallback((ctx, w, h, t, animalName) => {
     ctx.clearRect(0, 0, w, h);
     if (!animalName) return;
     const img = loadSummonImage(animalName);
@@ -389,9 +388,9 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       ctx.globalAlpha = progress * 0.7; ctx.drawImage(img, x, y, dw, dh);
     }
     ctx.globalAlpha = 1;
-  };
+  }, []);
 
-  const renderWater = (ctx, w, h, frame, particles) => {
+  const renderWater = useCallback((ctx, w, h, _frame, particles) => {
     const video = window.currentVideoElement;
     const segmenter = window.currentSegmenter;
     const cx = w / 2, cy = h / 2;
@@ -414,9 +413,9 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       ctx.save(); ctx.globalAlpha = 1; ctx.drawImage(userCanvasRef.current, 0, 0, w, h); ctx.restore();
     }
     ctx.globalAlpha = 1;
-  };
+  }, [updateSegmentation]);
 
-  const renderSusanoo = (ctx, w, h, frame) => {
+  const renderSusanoo = useCallback((ctx, w, h, frame) => {
     const video = window.currentVideoElement;
     const segmenter = window.currentSegmenter;
     if (video && segmenter) updateSegmentation(video, segmenter, video.videoWidth, video.videoHeight);
@@ -429,19 +428,19 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
     if (video && isSegmentingRef.current) {
       ctx.save(); ctx.globalAlpha = 1; ctx.drawImage(userCanvasRef.current, 0, 0, w, h); ctx.restore();
     }
-  };
+  }, [updateSegmentation]);
 
-  const renderPush = (ctx, cx, cy, tx, ty, frame) => {
+  const renderPush = useCallback((_ctx, _cx, _cy, tx, ty, frame) => {
     const progress = (frame % 30) / 30, radius = progress * 800;
-    ctx.save();
-    ctx.lineWidth = 40 * (1 - progress); ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * (1 - progress)})`;
-    ctx.beginPath(); ctx.arc(tx, ty, radius, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-  };
+    _ctx.save();
+    _ctx.lineWidth = 40 * (1 - progress); _ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * (1 - progress)})`;
+    _ctx.beginPath(); _ctx.arc(tx, ty, radius, 0, Math.PI * 2); _ctx.stroke();
+    _ctx.restore();
+  }, []);
 
-  const renderShadow = (ctx, w, h, hand, t, clones) => {
+  const renderShadow = useCallback((ctx, w, h, _hand, t, clones) => {
     ctx.clearRect(0, 0, w, h);
-    const cx = hand[9].x * w, cy = hand[9].y * h;
+    // const _cx = hand[9].x * w, _cy = hand[9].y * h;
     clones.forEach(c => {
       const progress = Math.min(t / c.spawnTime, 1);
       ctx.globalAlpha = progress * 0.55;
@@ -454,13 +453,19 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       }
     });
     ctx.shadowBlur = 0;
-  };
+  }, []);
 
   /* ── Hooks ─────────────────────────────────────── */
   useEffect(() => {
     const timer = setTimeout(() => setShowCutIn(false), 1200);
-    if (jutsu.effectType === 'summon') setSummonedAnimal('gamapunta');
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (jutsu.effectType === 'summon') {
+      const t = setTimeout(() => setSummonedAnimal('gamapunta'), 0);
+      return () => clearTimeout(t);
+    }
   }, [jutsu]);
 
   const initParticles = useCallback((type, cx, cy) => {
@@ -514,7 +519,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
     };
     loop();
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [jutsu, initParticles, summonedAnimal, handLandmarks]);
+  }, [jutsu, initParticles, summonedAnimal, handLandmarks, renderChidori, renderRasengan, renderKaton, renderShadow, renderClone, renderSummon, renderWater, renderSusanoo, renderPush, renderHeal]);
 
   if (!jutsu) return null;
 

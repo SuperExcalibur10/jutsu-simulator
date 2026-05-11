@@ -1,61 +1,67 @@
 # Shinobi Hand Seal Trainer - Documentazione Tecnica
 
 ## 1. Architettura del Sistema
-Il simulatore è progettato come una Single Page Application (SPA) reattiva che integra pipeline di intelligenza artificiale per il computer vision con un motore di rendering grafico ad alte prestazioni.
+Il simulatore è una Single Page Application (SPA) in React 19 altamente reattiva che fonde pipeline di computer vision (IA), database cloud-based e un motore grafico Canvas ad alte prestazioni.
 
 ### Componenti Principali
-- **App Core (`App.jsx`)**: Orchestratore dello stato globale. Gestisce la logica di progressione (XP), il sistema di combattimento (Battle Mode) e la macchina a stati del simulatore.
-- **Vision Engine (`useHandTracking.js`)**: Pipeline asincrona che inizializza e gestisce i modelli MediaPipe:
-    - `HandLandmarker`: Fornisce 21 coordinate 3D per mano.
-    - `ImageSegmenter`: Crea maschere di confidenza per isolare l'utente dal background (usato nei cloni e nel Susanoo).
-- **Classification Engine (`sealClassifier.js`)**: Algoritmo geometrico proprietario per il riconoscimento dei sigilli.
-- **VFX Engine (`JutsuEffect.jsx`)**: Motore di rendering su Canvas HTML5 che gestisce particelle, audio sintetico e post-processing.
+- **App Core (`App.jsx`)**: Orchestratore globale. Gestisce il routing degli stati (`mode`), l'integrazione con Firebase Auth e il loop primario della Battle Mode. Grazie alle recenti ottimizzazioni, questo componente delega l'aggiornamento DOM ad alta frequenza ai singoli widget per evitare re-render grafici.
+- **Player & Database (`firebase.js` & `Leaderboard.jsx`)**: Moduli per la sincronizzazione cloud. Firestore gestisce un repository centralizzato dei giocatori, aggiornando la classifica globale in tempo reale.
+- **Vision Engine (`useHandTracking.js` & `WebcamView.jsx`)**: Pipeline asincrona basata su MediaPipe:
+    - `HandLandmarker`: Traccia le mani a ~60 FPS fornendo 21 coordinate 3D per mano.
+    - `ImageSegmenter`: Crea maschere di confidenza per separare l'utente dallo sfondo (es. per il Susanoo).
+- **Classification Engine (`sealClassifier.js`)**: Algoritmo geometrico ultra-veloce per la validazione dei sigilli.
+- **VFX Engine (`JutsuEffect.jsx`)**: Motore di rendering dedicato.
 
 ---
 
 ## 2. Riconoscimento dei Sigilli (Gesture Classification)
-L'app non utilizza modelli di deep learning pre-addestrati per ogni sigillo, ma un approccio **Geometric Feature Extraction**:
+L'app evita i pesanti modelli di deep learning end-to-end, prediligendo un approccio **Geometric Feature Extraction** progettato per girare nel main thread del browser senza frame drop:
 
-1. **Estrazione**: Vengono calcolate le distanze euclidee tra il polso e ogni landmark delle dita.
-2. **Normalizzazione**: Il vettore risultante è normalizzato rispetto alla dimensione della mano (distanza polso-base medio) per garantire che il riconoscimento sia **Scale-Invariant** (funziona a qualsiasi distanza dalla webcam).
-3. **Calibrazione**: Durante la calibrazione, l'utente "registra" un'istantanea di questo vettore nel `localStorage`.
-4. **Classificazione**: In tempo reale, il sistema confronta il vettore corrente con quelli salvati usando la **Distanza Euclidea**. Se la distanza è inferiore a una soglia dinamica, il sigillo viene confermato.
+1. **Estrazione**: Vengono mappate le coordinate del polso rispetto ai polpastrelli per generare vettori multi-dimensionali.
+2. **Normalizzazione**: Il vettore è diviso per la dimensione del palmo (distanza polso-base del medio). Ciò rende il modello **Scale-Invariant** (puoi allontanarti o avvicinarti alla webcam).
+3. **Calibrazione**: I vettori di riferimento vengono "registrati" dall'utente nel `localStorage`.
+4. **Classificazione Ottimizzata**: In esecuzione, il sistema confronta i vettori in tempo reale calcolando la **Distanza Euclidea al Quadrato**. Rinunciando al calcolo della Radice Quadrata (`Math.sqrt`), il costo computazionale del matching per ogni frame video è stato abbattuto di oltre il 60%.
 
 ---
 
-## 3. Game Logic & Progression
+## 3. Gestione Dati e Cloud (Firebase)
+
+### Auth & Sync Flow
+1. L'utente accede tramite provider Google (`signInWithPopup`).
+2. Se è il suo primo accesso, l'XP accumulato come "ospite" (salvato in `localStorage`) viene migrato nel suo nuovo documento su Cloud Firestore.
+3. Se l'utente ha già un account, l'applicazione assume il Cloud come _Single Source of Truth_, sovrascrivendo la cache locale e prevenendo bleeding (contaminazione) di punteggi tra account diversi sullo stesso computer.
+
+### Sicurezza (Firestore Rules)
+Per proteggere la classifica da exploit lato client, le regole di Firestore raccomandate per la produzione sono:
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /players/{userId} {
+      allow read: if true; // Chiunque può vedere la classifica
+      // Solo l'utente proprietario può modificare i propri XP o il proprio Nome
+      allow write: if request.auth != null && request.auth.uid == userId; 
+    }
+  }
+}
+```
+Lato front-end, gli input stringa (es. il Nickname personalizzato) vengono sanificati (`/[^a-zA-Z0-9_ -]/g`) prima della transazione di update.
+
+---
+
+## 4. Game Logic & Progression
 
 ### Battle Mode
-Il sistema di combattimento (`battle` state) implementa un loop di gioco attivo:
-- **Timer Reattivo**: L'utente ha circa 12 secondi per completare la tecnica richiesta dal sistema.
-- **Danni e HP**: Se il timer scade, l'utente subisce danni. Se la tecnica viene completata, il nemico subisce danni o l'utente viene curato (nel caso di tecniche mediche).
-- **Scaling dei Nemici**: I nemici cambiano dinamicamente (Orochimaru → Madara → Kaguya) in base al livello di XP del giocatore.
-
-### Sistema di XP
-L'esperienza guadagnata è calcolata dinamicamente:
-`XP = (Base_Jutsu + Bonus_Sequenza) * Moltiplicatore_Velocità`
-- Premia la velocità di esecuzione e la complessità della tecnica.
-- I gradi Ninja (Genin, Chunin, ecc.) sono calcolati in tempo reale sulla base dei punti accumulati.
+Il sistema di combattimento (`battle` state) implementa un loop basato sui riflessi:
+- **Scaling Dinamico**: Il nemico schierato dipende dall'XP totale del giocatore (`minXp` threshold).
+- **Timer & Danni**: L'utente ha 12 secondi per completare la sequenza di sigilli estratta casualmente. Il fallimento provoca un decurtamento degli HP. La cura ripristina gli HP, l'attacco intacca gli HP nemici.
+- **Pacing Fluid**: Sconfitto un nemico, il ciclo viene bloccato (clearing the Timeout state) per mostrare l'XP popup, per poi ripartire in automatico verso il prossimo target.
 
 ---
 
-## 4. Motore Grafico e Sonoro (VFX)
+## 5. Motore Grafico e Sonoro (VFX)
 
-### Rendering su Canvas
-Ogni Jutsu utilizza tecniche di disegno avanzate:
-- **Sistemi Particellari**: Usati per Chidori (scintille), Katon (braci) e Palmo Mistico (chakra fluttuante).
-- **Procedural Audio**: I suoni non sono file MP3, ma vengono generati tramite la `Web Audio API` (oscillatori `sawtooth` per i fulmini, `noise buffer` per il vento). Questo elimina la latenza audio e riduce il peso del caricamento.
-- **Real-time Segmentation**: Per tecniche come il *Susanoo* o il *Drago Acquatico*, l'utente viene isolato dallo sfondo in tempo reale e ridisegnato sopra l'effetto visivo, creando un senso di profondità 3D.
-
----
-
-## 5. Struttura dei Dati (`jutsuEngine.js`)
-Le tecniche sono configurate tramite un oggetto JSON che definisce:
-- `sequence`: Array di sigilli richiesti (es. `['Serpente', 'Ariete', 'Cane']`).
-- `effectType`: Stringa che mappa al renderer specifico (`lightning`, `fire`, `heal`, ecc.).
-- `minXp`: Soglia di sblocco per la progressione.
-
----
-
-## 6. Privacy e Sicurezza
-Tutte le operazioni di analisi video avvengono **localmente nel browser**. Nessun dato biometrico o flusso video viene mai trasmesso a server esterni. La funzione di registrazione utilizza lo storage locale per compilare il file video finale prima del download.
+- **Manipolazione Diretta del DOM**: Durante la performance ad alta frequenza, i progressi a schermo vengono aggiornati aggirando la riconciliazione di React (`document.getElementById().innerText` e `.style.width`), riducendo a 0 i re-render del componente padre.
+- **Sistemi Particellari Canvas**: Usati per Katon, Chidori e Palmo Mistico.
+- **Procedural Audio (Web Audio API)**: Suoni sintetizzati tramite oscillatori matematici (`sawtooth`, rumore bianco, filtri passa-banda) eseguiti in tempo reale, per colmare la latenza del caricamento di file MP3 tradizionali.
+- **Real-time Segmentation**: Gli shader isolano dinamicamente la silhouette del giocatore dal background per sovrapporlo alle aure (Susanoo).

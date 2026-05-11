@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useHandTracking } from '../hooks/useHandTracking';
 
 const WebcamView = ({ onResults, currentSong }) => {
@@ -134,7 +134,7 @@ const WebcamView = ({ onResults, currentSong }) => {
 
     let lastVideoTime = -1;
     
-    const renderLoop = (time) => {
+    const renderLoop = () => {
       // Ottimizzazione: eseguiamo il tracciamento solo se il frame video è cambiato
       if (videoRef.current && videoRef.current.currentTime !== lastVideoTime) {
         lastVideoTime = videoRef.current.currentTime;
