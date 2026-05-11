@@ -487,6 +487,8 @@ function App() {
     const duration = (performance.now() - performanceStartTimeRef.current) / 1000;
     const jutsu = selectedJutsuRef.current;
     
+    let isEnemyDefeated = false;
+
     if (jutsu) {
       const base = 50 + (jutsu.sequence.length * 10);
       const speedBonus = Math.max(1, 1.5 - (duration / 20));
@@ -504,7 +506,7 @@ function App() {
       setTimeout(() => setShowXpPopup(false), 3000);
 
       const newEnemyHp = Math.max(0, battle.enemyHp - 25);
-      const isEnemyDefeated = battle.active && jutsu.effectType !== 'heal' && newEnemyHp === 0;
+      isEnemyDefeated = battle.active && jutsu.effectType !== 'heal' && newEnemyHp === 0;
 
       // Battle Damage or Healing
       setBattle(prev => {
