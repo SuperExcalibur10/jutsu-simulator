@@ -524,9 +524,16 @@ function App() {
     }
   }, [totalXp, setSelectedJutsu, setMode, setCalibrationQueue, setCalibrationIndex, setSequenceStep]);
 
-  const startBattle = () => {
+  const startBattle = (bossId = null) => {
     const availableEnemies = Object.entries(BOSSES).filter(([, b]) => totalXp >= b.minXp);
-    const [selectedEnemyId, bossData] = availableEnemies[Math.floor(Math.random() * availableEnemies.length)];
+    
+    let selectedEnemyId, bossData;
+    if (bossId && BOSSES[bossId]) {
+      selectedEnemyId = bossId;
+      bossData = BOSSES[bossId];
+    } else {
+      [selectedEnemyId, bossData] = availableEnemies[Math.floor(Math.random() * availableEnemies.length)];
+    }
 
     setBattle({
       active: true,
@@ -576,8 +583,10 @@ function App() {
       }, 0);
     }
     if (battle.active && battle.enemyHp <= 0) {
-      const bonus = 500;
       const defeatedEnemy = battle.enemy;
+      const bossData = BOSSES[defeatedEnemy];
+      const bonus = bossData?.xpReward || 500;
+      
       setTimeout(() => {
         // Stats
         const newStats = { ...statsRef.current, wins: (statsRef.current.wins || 0) + 1 };
@@ -591,7 +600,7 @@ function App() {
         setTotalXp(prev => { const next = prev + bonus; localStorage.setItem(STORAGE_KEY_XP, next.toString()); return next; });
         syncXpToCloud(totalXpRef.current + bonus);
         setLastXpEarned(bonus);
-        setXpPopupTitle(`HAI SCONFITTO ${defeatedEnemy.toUpperCase()}!`);
+        setXpPopupTitle(`HAI SCONFITTO ${bossData?.name.toUpperCase() || defeatedEnemy.toUpperCase()}!`);
         setShowXpPopup(true);
         setBattle(prev => ({ ...prev, active: false, status: 'VITTORIA!' }));
         setMode('jutsu-select');
@@ -1392,6 +1401,68 @@ function App() {
           isHidden={user?.email === import.meta.env.VITE_ADMIN_EMAIL}
           onBack={() => setMode('jutsu-select')}
         />
+      )}
+
+      {/* ── Boss Selection Overlay ── */}
+      {mode === 'boss-select' && (
+        <div className="recal-overlay">
+          <div className="glass-panel" style={{ maxWidth: '800px', width: '95%', maxHeight: '90vh', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', overflow: 'hidden' }}>
+            <div style={{ textAlign: 'center' }}>
+              <h2 style={{ fontFamily: 'var(--font-title)', fontSize: '2.2rem', letterSpacing: '0.1em', margin: 0, color: 'var(--naruto-orange)' }}>SELEZIONA AVVERSARIO</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Scegli chi sfidare o tenta la sorte con una battaglia casuale.</p>
+            </div>
+
+            <button 
+              className="ninja-btn primary" 
+              style={{ padding: '1.2rem', fontSize: '1.2rem', background: 'linear-gradient(45deg, #f97316, #ea580c)' }}
+              onClick={() => startBattle(null)}
+            >
+              🎲 BATTAGLIA CASUALE
+            </button>
+
+            <div style={{ 
+              flex: 1, 
+              overflowY: 'auto', 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
+              gap: '1rem',
+              padding: '0.5rem'
+            }} className="sidebar">
+              {Object.entries(BOSSES).map(([id, boss]) => {
+                const isLocked = totalXp < boss.minXp;
+                return (
+                  <div 
+                    key={id}
+                    className={`glass-panel boss-card ${isLocked ? 'locked' : ''}`}
+                    style={{
+                      padding: '1rem',
+                      textAlign: 'center',
+                      cursor: isLocked ? 'not-allowed' : 'pointer',
+                      border: isLocked ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(255,255,255,0.1)',
+                      opacity: isLocked ? 0.5 : 1,
+                      position: 'relative',
+                      transition: 'all 0.3s'
+                    }}
+                    onClick={() => !isLocked && startBattle(id)}
+                  >
+                    <img src={`/villain/${id}.png`} alt="" style={{ width: '80px', height: '80px', objectFit: 'contain', marginBottom: '0.8rem', filter: isLocked ? 'grayscale(1) brightness(0.5)' : 'none' }} />
+                    <div style={{ fontWeight: 'bold', fontSize: '1rem', color: isLocked ? 'var(--text-muted)' : '#fff' }}>{boss.name}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--naruto-orange)', marginTop: '0.2rem' }}>{boss.maxHp} HP</div>
+                    {isLocked && (
+                      <div style={{ fontSize: '0.65rem', color: '#ef4444', marginTop: '0.5rem' }}>
+                        🔒 Richiede {boss.minXp} XP
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button className="ninja-btn" onClick={() => setMode('jutsu-select')}>
+              ANNULLA
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ── Profile Stats Overlay ── */}

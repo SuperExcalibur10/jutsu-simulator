@@ -161,16 +161,16 @@ export const SEALS_LIST = [...new Set(
 )];
 
 export const BOSSES = {
-  zabusa:     { name: 'Zabuza',     maxHp: 80,  minXp: 0,     specialAttack: 'Taglio della Mannaia',    specialDamage: 15,  weakness: 'lightning' },
-  deidara:    { name: 'Deidara',    maxHp: 120, minXp: 400,   specialAttack: 'C4 Karura',               specialDamage: 25,  weakness: 'lightning' },
-  orochimaru: { name: 'Orochimaru', maxHp: 140, minXp: 1000,  specialAttack: 'Spada Kusanagi',          specialDamage: 35,  weakness: 'susanoo'   },
-  kabuto:     { name: 'Kabuto',     maxHp: 160, minXp: 1800,  specialAttack: 'Edo Tensei',              specialDamage: 40,  weakness: 'sharingan' },
-  danzo:      { name: 'Danzō',      maxHp: 180, minXp: 2800,  specialAttack: 'Izanagi',                 specialDamage: 45,  weakness: 'susanoo'   },
-  itachi:     { name: 'Itachi',     maxHp: 200, minXp: 4000,  specialAttack: 'Amaterasu',               specialDamage: 60,  weakness: 'lightning' },
-  sasuke:     { name: 'Sasuke',     maxHp: 220, minXp: 5500,  specialAttack: 'Freccia di Indra',        specialDamage: 70,  weakness: 'wind'      },
-  pain:       { name: 'Pain',       maxHp: 250, minXp: 7500,  specialAttack: 'Shinra Tensei',           specialDamage: 90,  weakness: 'summon'    },
-  obito:      { name: 'Obito',      maxHp: 280, minXp: 10000, specialAttack: 'Kamui',                   specialDamage: 110, weakness: 'water'     },
-  madara:     { name: 'Madara',     maxHp: 320, minXp: 13000, specialAttack: 'Meteora Celeste',         specialDamage: 130, weakness: 'shadow'    },
-  zetsu:      { name: 'Zetsu Nero', maxHp: 360, minXp: 16000, specialAttack: 'Tradimento Oscuro',       specialDamage: 150, weakness: 'push'      },
-  kaguya:     { name: 'Kaguya',     maxHp: 400, minXp: 19000, specialAttack: 'Cenere Polverizzatrice',  specialDamage: 180, weakness: 'push'      },
+  zabusa:     { name: 'Zabuza',     maxHp: 80,  minXp: 0,     specialAttack: 'Taglio della Mannaia',    specialDamage: 15,  xpReward: 100,  weakness: 'lightning' },
+  deidara:    { name: 'Deidara',    maxHp: 120, minXp: 400,   specialAttack: 'C4 Karura',               specialDamage: 25,  xpReward: 150,  weakness: 'lightning' },
+  orochimaru: { name: 'Orochimaru', maxHp: 140, minXp: 1000,  specialAttack: 'Spada Kusanagi',          specialDamage: 35,  xpReward: 200,  weakness: 'susanoo'   },
+  kabuto:     { name: 'Kabuto',     maxHp: 160, minXp: 1800,  specialAttack: 'Edo Tensei',              specialDamage: 40,  xpReward: 250,  weakness: 'sharingan' },
+  danzo:      { name: 'Danzō',      maxHp: 180, minXp: 2800,  specialAttack: 'Izanagi',                 specialDamage: 45,  xpReward: 300,  weakness: 'susanoo'   },
+  itachi:     { name: 'Itachi',     maxHp: 200, minXp: 4000,  specialAttack: 'Amaterasu',               specialDamage: 60,  xpReward: 400,  weakness: 'lightning' },
+  sasuke:     { name: 'Sasuke',     maxHp: 220, minXp: 5500,  specialAttack: 'Freccia di Indra',        specialDamage: 70,  xpReward: 500,  weakness: 'wind'      },
+  pain:       { name: 'Pain',       maxHp: 250, minXp: 7500,  specialAttack: 'Shinra Tensei',           specialDamage: 90,  xpReward: 600,  weakness: 'summon'    },
+  obito:      { name: 'Obito',      maxHp: 280, minXp: 10000, specialAttack: 'Kamui',                   specialDamage: 110, xpReward: 700,  weakness: 'water'     },
+  madara:     { name: 'Madara',     maxHp: 320, minXp: 13000, specialAttack: 'Meteora Celeste',         specialDamage: 130, xpReward: 800,  weakness: 'shadow'    },
+  zetsu:      { name: 'Zetsu Nero', maxHp: 360, minXp: 16000, specialAttack: 'Tradimento Oscuro',       specialDamage: 150, xpReward: 900,  weakness: 'push'      },
+  kaguya:     { name: 'Kaguya',     maxHp: 400, minXp: 19000, specialAttack: 'Cenere Polverizzatrice',  specialDamage: 180, xpReward: 1000, weakness: 'push'      },
 };
