@@ -1,9 +1,9 @@
 export const RANKS = [
-  { name: 'Accademia', min: 0,    maxHp: 100, color: '#94A3B8' },
-  { name: 'Genin',     min: 200,  maxHp: 120, color: '#22C55E' },
-  { name: 'Chunin',    min: 1000, maxHp: 150, color: '#3B82F6' },
-  { name: 'Jonin',     min: 3000, maxHp: 200, color: '#A855F7' },
-  { name: 'Kage',      min: 7000, maxHp: 300, color: '#F97316' }
+  { name: 'Accademia', min: 0,     maxHp: 100, color: '#94A3B8' },
+  { name: 'Genin',     min: 1000,  maxHp: 120, color: '#22C55E' },
+  { name: 'Chunin',    min: 3000,  maxHp: 150, color: '#3B82F6' },
+  { name: 'Jonin',     min: 8000,  maxHp: 200, color: '#A855F7' },
+  { name: 'Kage',      min: 15000, maxHp: 300, color: '#F97316' }
 ];
 
 export const getCurrentRank = (xp) => {

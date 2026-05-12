@@ -6,79 +6,77 @@
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%26%20Auth-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-A high-performance web application that uses **real-time computer vision** to recognize Naruto-style hand seals and trigger spectacular elemental techniques. Experience the life of a shinobi with advanced tracking, a dynamic battle system, global leaderboards, and premium visual effects.
+A high-performance web application that uses **real-time computer vision** to recognize Naruto-style hand seals and trigger spectacular elemental techniques. Experience the life of a shinobi with advanced tracking, a strategic boss-rush system, global leaderboards, and an immersive soundtrack.
 
 ![App Screenshot](/public/assets/naruto_logo.png)
 
 ## 🌟 Key Features
 
 - **🎯 Real-Time Hand Tracking**: Powered by Google's MediaPipe for high-precision detection of 21 hand landmarks per hand, fully supporting complex two-handed jutsu.
-- **⚔️ Strategic Ninja Battles**: Face a roster of 12 legendary villains. Choose your opponent via a dedicated selection menu or opt for random encounters. Difficulty and rewards scale based on the opponent's strength.
-- **🎵 Dynamic Soundtrack**: Integrated music player with pause/skip controls and a library of 9 iconic Naruto tracks.
-- **☁️ Cloud Sync & Global Leaderboard**: Sign in securely with Google via **Firebase Authentication**. Your XP and Rank are synchronized across devices via **Cloud Firestore**.
-- **📈 Progression & Ranks**: Earn calibrated XP rewards and rise through ranks from Academy Student to Kage, with your Max HP increasing as you grow stronger.
-- **✨ Premium Visuals & Audio**: Dynamic HTML5 Canvas effects, cinematic character cut-ins, procedural audio synthesis (Web Audio API), and real-time AI background segmentation (Susanoo).
+- **👹 Legendary Boss Rush**: Face 12 iconic villains. Access the **Enemy Selection Menu** to choose your target or gamble with a random encounter.
+- **📈 Progressive Scaling**: Your ninja rank dictates your Max HP, while enemies scale in lethality and rewards as you climb the leaderboard.
+- **🎵 Cinematic OST**: Integrated music player with pause/skip controls and a library of 9 iconic Naruto tracks.
+- **☁️ Cloud Sync**: Secure Google login via **Firebase Authentication** with real-time XP and rank synchronization via **Cloud Firestore**.
 - **🎥 Session Recording**: Capture and download your jutsu performances with the integrated browser screen recorder.
-- **🔒 Privacy First**: All AI vision processing is done locally in your browser. No video data ever leaves your device. Only your nickname and XP are saved to the cloud.
+- **🔒 Privacy First**: All AI vision processing is done locally in your browser. No video data ever leaves your device.
 
 ## 🥷 Available Techniques
 
-| Jutsu | Character | Difficulty | Effect |
+| Jutsu | Character | Damage | Unlock (XP) | Effect |
+| :--- | :--- | :--- | :--- | :--- |
+| **Shōsen Jutsu** | Sakura | 0 | 0 | Healing (+30 HP) |
+| **Bunshin no Jutsu** | Naruto | 20 | 0 | Multi-Clone Visual |
+| **Katon: Gōkakyū** | Sasuke | 35 | 0 | Fire Explosion |
+| **Rasengan** | Naruto | 40 | 0 | Wind Sphere |
+| **Chidori** | Kakashi | 45 | 600 | Lightning Strike |
+| **Kage Bunshin** | Naruto | 50 | 1,200 | Shadow Clones |
+| **Kuchiyose** | Jiraiya | 65 | 2,500 | Summon Gamabunta |
+| **Suiton: Suiryūdan** | Kisame | 80 | 4,500 | Water Dragon |
+| **Mangekyō Sharingan** | Itachi | 100 | 6,000 | Tsukuyomi Illusion |
+| **Susanoo** | Itachi | 125 | 8,000 | Spectral Armor |
+| **Shinra Tensei** | Pain | 150 | 12,000 | Repulsion Pulse |
+| **Indra no Ya** | Sasuke | 200 | 16,000 | Indra's Arrow |
+
+## 👹 Legendary Villains
+
+Choose your opponent from the strategic selection menu. Each boss has unique HP and specific XP rewards.
+
+| Villain | HP | Req. XP | Reward |
 | :--- | :--- | :--- | :--- |
-| **Shōsen Jutsu** | Sakura | 🟢 Easy | Healing (+30 HP) |
-| **Bunshin no Jutsu** | Naruto | 🟢 Easy | Clone visual |
-| **Katon: Gōkakyū** | Sasuke | 🟡 Medium | Fire Explosion |
-| **Rasengan** | Naruto | 🟡 Medium | Wind Sphere |
-| **Chidori** | Kakashi | 🟠 Hard | Lightning Strike |
-| **Suiton: Suiryūdan** | Kisame | 🔴 Elite | Water Dragon |
-| **Susanoo** | Itachi | 🟣 Mythic | Spectral Armor |
-| **Shinra Tensei** | Pain | ⚪ Godly | Repulsion Pulse |
+| **Zabuza** | 80 | 0 | 100 XP |
+| **Deidara** | 120 | 400 | 150 XP |
+| **Orochimaru** | 140 | 1,000 | 200 XP |
+| **Kabuto** | 160 | 1,800 | 250 XP |
+| **Danzō** | 180 | 2,800 | 300 XP |
+| **Itachi** | 200 | 4,000 | 400 XP |
+| **Sasuke** | 220 | 5,500 | 500 XP |
+| **Pain** | 250 | 7,500 | 600 XP |
+| **Obito** | 280 | 10,000 | 700 XP |
+| **Madara** | 320 | 13,000 | 800 XP |
+| **Zetsu Nero** | 360 | 16,000 | 900 XP |
+| **Kaguya** | 400 | 19,000 | 1,000 XP |
+
+## 📉 Ninja Ranks & HP
+
+Your survival depends on your rank. Earn XP to unlock higher health pools.
+
+- **Accademia**: 100 HP (Start)
+- **Genin**: 120 HP (400 XP)
+- **Chunin**: 150 HP (1,000 XP)
+- **Jonin**: 200 HP (3,000 XP)
+- **Kage**: 300 HP (7,000 XP)
+
+## 🎵 Soundtrack (OST)
+
+Enjoy 9 iconic tracks with full player controls:
+- *Blue Bird*, *Distance*, *Haruka Kanata*, *Hero's Come Back*, *Itachi's Theme*, *Naruto Italian Opening*, *Rhapsody of Youth*, *Sign*, *Silhouette*.
 
 ## 🚀 Getting Started
 
-### Prerequisites
-- Node.js (v18 or higher)
-- A working webcam
-- A Firebase Project (for Auth and Firestore)
-
-### Installation
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/your-username/jutsu-simulator.git
-   ```
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-3. **Environment Setup**:
-   Create a `.env` file in the root directory and add your Firebase configuration:
-   ```env
-   VITE_FIREBASE_API_KEY=your_api_key
-   VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-   VITE_FIREBASE_PROJECT_ID=your_project_id
-   VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-   VITE_FIREBASE_APP_ID=your_app_id
-   ```
-4. **Run the development server**:
-   ```bash
-   npm run dev
-   ```
-5. **Access the App**:
-   Open [http://localhost:5173](http://localhost:5173).
-
-## 🛠️ Technology Stack
-
-- **Framework**: React 19 + Vite
-- **Backend/DB**: Firebase Authentication & Cloud Firestore
-- **Computer Vision**: `@mediapipe/tasks-vision` (HandLandmarker & ImageSegmenter)
-- **Audio**: Web Audio API (Generative synthesis)
-- **Rendering**: HTML5 Canvas API (Particle systems & Video segmentation)
-- **Styling**: Vanilla CSS (Advanced Glassmorphism & Micro-animations)
-
-## 📜 Technical Documentation
-
-For a deep dive into the math behind the geometric gesture classification, the Firebase security rules, and the component architecture, check out the [DOCUMENTATION.md](./DOCUMENTATION.md).
+1. **Install dependencies**: `npm install`
+2. **Setup environment**: Create `.env` with Firebase keys (see `.env.example`).
+3. **Run Dev**: `npm run dev`
+4. **Calibrate**: Follow the in-app guide to record your hand seals.
 
 ---
 *Created with passion for the Naruto universe. Dattebayo!*

@@ -542,7 +542,7 @@ function App() {
       userMaxHp: currentRank.maxHp,
       enemyHp: bossData.maxHp,
       enemyMaxHp: bossData.maxHp,
-      timer: 12,
+      timer: 10,
       status: 'PREPARATI AL COMBATTIMENTO!',
       damageFlash: false
     });
