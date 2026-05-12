@@ -9,6 +9,12 @@ dragonImg.src = '/effects/drago acquatico.png';
 const susanooImg = new Image();
 susanooImg.src = '/effects/susanoo.png';
 
+const sharinganImg = new Image();
+sharinganImg.src = '/effects/sharingan.png';
+
+const ravenImg = new Image();
+ravenImg.src = '/effects/raven.png';
+
 /* ── Audio ──────────────────────────────────────── */
 const playSound = (type, audioCtx, volume = 0.5) => {
   try {
@@ -609,42 +615,14 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
       ctx.fillStyle = halo;
       ctx.beginPath(); ctx.arc(ex, ey, eyeR * 2.8 * pulse, 0, Math.PI*2); ctx.fill();
 
-      // Eyelid shape (white ellipse background)
-      ctx.fillStyle = 'rgba(8,0,0,0.95)';
-      ctx.beginPath(); ctx.ellipse(ex, ey, eyeR * 1.55, eyeR * 1.0, 0, 0, Math.PI*2); ctx.fill();
-
-      // Red iris
-      const irisG = ctx.createRadialGradient(ex - eyeR*0.15, ey - eyeR*0.15, 0, ex, ey, eyeR);
-      irisG.addColorStop(0, '#ff3300');
-      irisG.addColorStop(0.55, '#cc0000');
-      irisG.addColorStop(1, '#550000');
-      ctx.fillStyle = irisG;
-      ctx.beginPath(); ctx.arc(ex, ey, eyeR, 0, Math.PI*2); ctx.fill();
-
-      // Three tomoe (rotating comma shapes)
-      for (let i = 0; i < 3; i++) {
-        const ta = rotation + (i / 3) * Math.PI * 2;
-        const orbit = eyeR * 0.52;
-        const tx_ = ex + Math.cos(ta) * orbit;
-        const ty_ = ey + Math.sin(ta) * orbit;
-        const tr = eyeR * 0.19;
-        // Teardrop body
-        ctx.fillStyle = '#000';
-        ctx.beginPath(); ctx.arc(tx_, ty_, tr, 0, Math.PI*2); ctx.fill();
-        // Comma tail sweeping toward center
-        const tailA = ta + Math.PI * 0.55;
-        const tailCx = ex + Math.cos(ta) * orbit * 0.62;
-        const tailCy = ey + Math.sin(ta) * orbit * 0.62;
-        ctx.beginPath();
-        ctx.arc(tailCx, tailCy, eyeR * 0.14, tailA, tailA + Math.PI * 1.1);
-        ctx.fill();
+      if (sharinganImg.complete && sharinganImg.naturalWidth !== 0) {
+        ctx.save();
+        ctx.translate(ex, ey);
+        ctx.rotate(rotation);
+        const size = eyeR * 3.5;
+        ctx.drawImage(sharinganImg, -size / 2, -size / 2, size, size);
+        ctx.restore();
       }
-
-      // Dark pupil with faint red shine
-      ctx.fillStyle = '#000';
-      ctx.beginPath(); ctx.arc(ex, ey, eyeR * 0.27, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = 'rgba(255,80,80,0.35)';
-      ctx.beginPath(); ctx.arc(ex - eyeR*0.07, ey - eyeR*0.09, eyeR * 0.09, 0, Math.PI*2); ctx.fill();
     }
     ctx.globalAlpha = 1;
 
@@ -663,40 +641,11 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
         ctx.save();
         ctx.translate(cx_, cy_);
         ctx.rotate(flightDir);
-        ctx.fillStyle = '#060000';
-        ctx.shadowBlur = 14; ctx.shadowColor = '#dc2626';
-        // Body — elongated oval
-        ctx.beginPath(); ctx.ellipse(0, 0, sz * 1.3, sz * 0.42, 0, 0, Math.PI*2); ctx.fill();
-        // Head — small circle forward
-        ctx.beginPath(); ctx.arc(sz * 1.0, -sz * 0.1, sz * 0.38, 0, Math.PI*2); ctx.fill();
-        // Beak — sharp forward triangle
-        ctx.beginPath();
-        ctx.moveTo(sz * 1.35, -sz * 0.16); ctx.lineTo(sz * 1.85, 0); ctx.lineTo(sz * 1.35, sz * 0.12);
-        ctx.closePath(); ctx.fill();
-        // Left wing up
-        ctx.save(); ctx.rotate(-wing * 0.9);
-        ctx.beginPath();
-        ctx.moveTo(-sz * 0.15, -sz * 0.1);
-        ctx.bezierCurveTo(-sz * 0.5, -sz * 1.5, -sz * 1.8, -sz * 1.1, -sz * 2.6, -sz * 0.35);
-        ctx.bezierCurveTo(-sz * 1.7, -sz * 0.05, -sz * 0.6, sz * 0.12, -sz * 0.15, -sz * 0.1);
-        ctx.closePath(); ctx.fill();
-        ctx.restore();
-        // Right wing down
-        ctx.save(); ctx.rotate(wing * 0.9);
-        ctx.beginPath();
-        ctx.moveTo(-sz * 0.15, sz * 0.1);
-        ctx.bezierCurveTo(-sz * 0.5, sz * 1.5, -sz * 1.8, sz * 1.1, -sz * 2.6, sz * 0.35);
-        ctx.bezierCurveTo(-sz * 1.7, sz * 0.05, -sz * 0.6, -sz * 0.12, -sz * 0.15, sz * 0.1);
-        ctx.closePath(); ctx.fill();
-        ctx.restore();
-        // Tail — forked fan
-        ctx.beginPath();
-        ctx.moveTo(-sz * 0.8, -sz * 0.1);
-        ctx.lineTo(-sz * 1.9, -sz * 0.5);
-        ctx.lineTo(-sz * 2.0, sz * 0.0);
-        ctx.lineTo(-sz * 1.9, sz * 0.5);
-        ctx.lineTo(-sz * 0.8, sz * 0.1);
-        ctx.closePath(); ctx.fill();
+        if (ravenImg.complete && ravenImg.naturalWidth !== 0) {
+          const size = sz * 5.5;
+          ctx.scale(1, 1 - wing * 0.35); // Simple flapping effect
+          ctx.drawImage(ravenImg, -size / 2, -size / 2, size, size);
+        }
         ctx.restore();
       });
       ctx.globalAlpha = 1;
