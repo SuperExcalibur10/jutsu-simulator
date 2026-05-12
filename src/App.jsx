@@ -1009,7 +1009,7 @@ function App() {
                 border: '1px solid rgba(255,255,255,0.2)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem'
               }}
-                onClick={startBattle} disabled={battle.active}>
+                onClick={() => setMode('boss-select')} disabled={battle.active}>
                 <span style={{ fontSize: '1.4rem' }}>⚔️</span> SCONTRO NINJA
               </button>
             </div>
