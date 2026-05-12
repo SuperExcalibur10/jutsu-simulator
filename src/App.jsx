@@ -26,6 +26,12 @@ const DEFAULT_VOLUME = { music: 0.25, effects: 0.5 };
 
 const BACKGROUND_MUSIC = [
   { title: "Blue Bird", file: "/sounds/Blue Bird.mp3" },
+  { title: "Distance", file: "/sounds/Distance.mp3" },
+  { title: "Haruka Kanata", file: "/sounds/Haruka Kanata.mp3" },
+  { title: "Hero's Come Back", file: "/sounds/Hero's come back.mp3" },
+  { title: "Itachi's Theme", file: "/sounds/Itachi's theme.mp3" },
+  { title: "Naruto Italian Opening", file: "/sounds/Naruto Italian Opening.mp3" },
+  { title: "Rhapsody of Youth", file: "/sounds/Rhapsody of Youth.mp3" },
   { title: "Sign", file: "/sounds/Sign.mp3" },
   { title: "Silhouette", file: "/sounds/Silhouette.mp3" }
 ];
@@ -118,6 +124,7 @@ function App() {
 
   /* ── Music state ────────────────────────────── */
   const [currentSong, setCurrentSong] = useState(null);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const audioRef = useRef(new Audio());
   const musicStartedRef = useRef(false);
 
@@ -142,25 +149,40 @@ function App() {
   useEffect(() => { statsRef.current = stats; }, [stats]);
 
   /* ── Music Logic ────────────────────────────── */
-  useEffect(() => {
-    const playRandom = () => {
-      const randomSong = BACKGROUND_MUSIC[Math.floor(Math.random() * BACKGROUND_MUSIC.length)];
-      setCurrentSong(randomSong);
-      audioRef.current.src = randomSong.file;
-      audioRef.current.volume = 0.25;
-      audioRef.current.play().catch(() => {
-        // Fallback: wait for first interaction if blocked
+  const playRandom = useCallback(() => {
+    const randomSong = BACKGROUND_MUSIC[Math.floor(Math.random() * BACKGROUND_MUSIC.length)];
+    setCurrentSong(randomSong);
+    audioRef.current.src = randomSong.file;
+    audioRef.current.volume = volume.music;
+    audioRef.current.play()
+      .then(() => { setIsMusicPlaying(true); musicStartedRef.current = true; })
+      .catch(() => {
         const startOnInteract = () => {
           if (!musicStartedRef.current) {
-            audioRef.current.play();
+            audioRef.current.play().then(() => setIsMusicPlaying(true));
             musicStartedRef.current = true;
           }
           window.removeEventListener('click', startOnInteract);
         };
         window.addEventListener('click', startOnInteract);
       });
-    };
+  }, [volume.music]);
 
+  const toggleMusic = useCallback(() => {
+    if (audioRef.current.paused) {
+      audioRef.current.play();
+      setIsMusicPlaying(true);
+    } else {
+      audioRef.current.pause();
+      setIsMusicPlaying(false);
+    }
+  }, []);
+
+  const skipMusic = useCallback(() => {
+    playRandom();
+  }, [playRandom]);
+
+  useEffect(() => {
     const audio = audioRef.current;
     audio.onended = playRandom;
     playRandom();
@@ -169,7 +191,7 @@ function App() {
       audio.pause();
       audio.src = '';
     };
-  }, []);
+  }, []); // Only on mount
   /* ── Volume sync ───────────────────────────── */
   useEffect(() => { audioRef.current.volume = volume.music; }, [volume.music]);
 
@@ -1397,6 +1419,23 @@ function App() {
             <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: '1.5rem' }}>
               I tuoi dati verranno crittografati e gestiti in modo sicuro tramite Firebase.
             </p>
+          </div>
+        </div>
+      )}
+      {/* ── Music Player Widget ── */}
+      {currentSong && (
+        <div className="music-player-widget">
+          <div className="music-info">
+            <div className="music-label">Riproduzione</div>
+            <div className="music-title">{currentSong.title}</div>
+          </div>
+          <div className="music-controls">
+            <button className="music-ctrl-btn" onClick={toggleMusic} title={isMusicPlaying ? "Pausa" : "Riproduci"}>
+              {isMusicPlaying ? "⏸" : "▶"}
+            </button>
+            <button className="music-ctrl-btn" onClick={skipMusic} title="Prossima Canzone">
+              ⏭
+            </button>
           </div>
         </div>
       )}
