@@ -602,8 +602,9 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
     const rotation = t * 0.022;
 
     for (let side = -1; side <= 1; side += 2) {
-      const ex = fcx + side * eyeSpacing;
-      const ey = fcy;
+      // Spostamento leggermente a sinistra (-w * 0.015) e leggermente in basso (+h * 0.03)
+      const ex = fcx + side * eyeSpacing - (w * 0.015);
+      const ey = fcy + (h * 0.03);
       ctx.globalAlpha = fadeIn;
 
       // Outer pulsing halo
@@ -619,7 +620,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
         ctx.save();
         ctx.translate(ex, ey);
         ctx.rotate(rotation);
-        const size = eyeR * 2.2;
+        const size = eyeR * 1.8; // Leggermente più piccoli
         ctx.drawImage(sharinganImg, -size / 2, -size / 2, size, size);
         ctx.restore();
       }
