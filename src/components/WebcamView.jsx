@@ -79,26 +79,25 @@ const WebcamView = ({ onResults, currentSong }) => {
 
   // Ottieni la lista delle telecamere disponibili
   useEffect(() => {
+    let cancelled = false;
     const getDevices = async () => {
+      let stream = null;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { frameRate: { ideal: 120, max: 120 } } 
-        });
-        const allDevices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = allDevices.filter(d => d.kind === 'videoinput');
-        
-        setDevices(videoDevices);
-        
-        if (videoDevices.length > 0) {
-          setSelectedDeviceId(videoDevices[0].deviceId);
-        }
-
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
         stream.getTracks().forEach(track => track.stop());
+        if (cancelled) return;
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled) return;
+        const videoDevices = allDevices.filter(d => d.kind === 'videoinput');
+        setDevices(videoDevices);
+        if (videoDevices.length > 0) setSelectedDeviceId(videoDevices[0].deviceId);
       } catch (err) {
-        console.error("Errore nell'ottenere i dispositivi:", err);
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        if (!cancelled) console.error("Errore nell'ottenere i dispositivi:", err);
       }
     };
     getDevices();
+    return () => { cancelled = true; };
   }, []);
 
   // Avvia la telecamera specifica selezionata

@@ -430,10 +430,12 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
     }
   }, [updateSegmentation]);
 
-  const renderPush = useCallback((_ctx, _cx, _cy, tx, ty, frame) => {
+  const renderPush = useCallback((_ctx, w, h, tx, ty, frame) => {
+    _ctx.clearRect(0, 0, w, h);
     const progress = (frame % 30) / 30, radius = progress * 800;
     _ctx.save();
-    _ctx.lineWidth = 40 * (1 - progress); _ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * (1 - progress)})`;
+    _ctx.lineWidth = 40 * (1 - progress);
+    _ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * (1 - progress)})`;
     _ctx.beginPath(); _ctx.arc(tx, ty, radius, 0, Math.PI * 2); _ctx.stroke();
     _ctx.restore();
   }, []);
@@ -493,7 +495,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
     return () => { 
       clearTimeout(timeout); 
       if (audioCtx) {
-        try { audioCtx.close(); } catch(e){}
+        try { audioCtx.close(); } catch { /* best-effort close */ }
       }
       if (rafRef.current) cancelAnimationFrame(rafRef.current); 
     };
@@ -527,7 +529,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
         case 'summon': renderSummon(ctx, w, h, t, summonedAnimal); break;
         case 'water': renderWater(ctx, w, h, frameRef.current, particlesRef.current); break;
         case 'susanoo': renderSusanoo(ctx, w, h, frameRef.current); break;
-        case 'push': renderPush(ctx, w/2, h/2, tx, ty, frameRef.current); break;
+        case 'push': renderPush(ctx, w, h, tx, ty, frameRef.current); break;
         case 'heal': renderHeal(ctx, w, h, usedHand, t, particlesRef.current); break;
       }
       rafRef.current = requestAnimationFrame(loop);

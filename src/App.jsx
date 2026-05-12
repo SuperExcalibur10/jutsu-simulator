@@ -1,18 +1,19 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import WebcamView from './components/WebcamView';
 import JutsuEffect from './components/JutsuEffect';
 import Leaderboard from './components/Leaderboard';
 import { auth, googleProvider, db } from './lib/firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { extractFeatures, classifySeal } from './utils/sealClassifier';
 import { JUTSUS, SEALS_LIST } from './utils/jutsuEngine';
-import { RANKS, getCurrentRank, getNextRank } from './utils/progression';
+import { getCurrentRank, getNextRank } from './utils/progression';
 
-const SEAL_HOLD_FRAMES = 10; // Faster recognition
+const ASSET_V = Date.now(); // stable cache-bust token — computed once at module load
+
+const SEAL_HOLD_FRAMES = 10;
 const STORAGE_KEY_SEALS = 'jutsu_sim_v4_seals';
 const STORAGE_KEY_XP = 'jutsu_sim_v4_xp';
-const STORAGE_KEY_NAME = 'jutsu_sim_v4_name';
 
 const BACKGROUND_MUSIC = [
   { title: "Blue Bird", file: "/sounds/Blue Bird.mp3" },
@@ -22,8 +23,16 @@ const BACKGROUND_MUSIC = [
 
 function App() {
   /* ── Core state ─────────────────────────────── */
-  const [calibratedSeals, setCalibratedSeals] = useState({});
-  const calibratedSealsRef = useRef({});
+  const [calibratedSeals, setCalibratedSeals] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SEALS);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      localStorage.removeItem(STORAGE_KEY_SEALS);
+      return {};
+    }
+  });
+  const calibratedSealsRef = useRef(calibratedSeals);
   const currentFeaturesBufferRef = useRef(null);
 
   // mode: 'jutsu-select' | 'calibration' | 'perform' | 'effect'
@@ -38,7 +47,10 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   /* ── Progression state ──────────────────────── */
-  const [totalXp, setTotalXp] = useState(0);
+  const [totalXp, setTotalXp] = useState(() => {
+    const parsed = parseInt(localStorage.getItem(STORAGE_KEY_XP), 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  });
   const [lastXpEarned, setLastXpEarned] = useState(0);
   const [showXpPopup, setShowXpPopup] = useState(false);
   const [xpPopupTitle, setXpPopupTitle] = useState('TECNICA COMPLETATA!');
@@ -79,10 +91,19 @@ function App() {
   const audioRef = useRef(new Audio());
   const musicStartedRef = useRef(false);
 
+  /* ── Derived state refs (always-fresh reads inside callbacks) ── */
+  const battleRef = useRef(battle);
+  const modeRef = useRef(mode);
+  const totalXpRef = useRef(totalXp);
+  const rankClicksRef = useRef([]);
+
   /* ── Keep refs in sync ──────────────────────── */
   useEffect(() => { calibratedSealsRef.current = calibratedSeals; }, [calibratedSeals]);
   useEffect(() => { selectedJutsuRef.current = selectedJutsu; }, [selectedJutsu]);
   useEffect(() => { sequenceStepRef.current = sequenceStep; }, [sequenceStep]);
+  useEffect(() => { battleRef.current = battle; }, [battle]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { totalXpRef.current = totalXp; }, [totalXp]);
 
   /* ── Music Logic ────────────────────────────── */
   useEffect(() => {
@@ -104,32 +125,17 @@ function App() {
       });
     };
 
-    audioRef.current.onended = playRandom;
+    const audio = audioRef.current;
+    audio.onended = playRandom;
     playRandom();
 
     return () => {
-      audioRef.current.pause();
-      audioRef.current.src = '';
+      audio.pause();
+      audio.src = '';
     };
   }, []);
-  /* ── Init: load saved data ──────────── */
+  /* ── Init: Firebase Auth Listener ──────────── */
   useEffect(() => {
-    const savedSeals = localStorage.getItem(STORAGE_KEY_SEALS);
-    if (savedSeals) {
-      try {
-        const parsed = JSON.parse(savedSeals);
-        setCalibratedSeals(parsed);
-        calibratedSealsRef.current = parsed;
-      } catch (e) { localStorage.removeItem(STORAGE_KEY_SEALS); }
-    }
-
-    const savedXp = localStorage.getItem(STORAGE_KEY_XP);
-    if (savedXp) {
-      const parsedXp = parseInt(savedXp, 10);
-      setTimeout(() => setTotalXp(parsedXp), 0);
-    }
-
-    // Firebase Auth Listener
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
@@ -151,11 +157,12 @@ function App() {
             setTotalXp(cloudXp);
             localStorage.setItem(STORAGE_KEY_XP, cloudXp.toString());
           } else {
-            // Create user in Firestore
+            // Create user in Firestore — use XP already in state (from lazy localStorage init)
+            const localXp = totalXpRef.current;
             await setDoc(userRef, {
               name: firebaseUser.displayName,
-              xp: parseInt(savedXp, 10) || 0,
-              rank: getCurrentRank(parseInt(savedXp, 10) || 0).name,
+              xp: localXp,
+              rank: getCurrentRank(localXp).name,
               photo: firebaseUser.photoURL,
               lastSeen: new Date()
             });
@@ -172,7 +179,6 @@ function App() {
       }
     });
 
-    setMode('jutsu-select');
     return () => unsubscribe();
   }, []);
 
@@ -206,7 +212,7 @@ function App() {
     }
   }, [user]);
 
-  const handleSaveName = async () => {
+  const handleSaveName = useCallback(async () => {
     if (!tempName || !user) return;
     const sanitizedName = tempName.replace(/[^a-zA-Z0-9_ -]/g, '').trim().substring(0, 15);
     if (!sanitizedName) return;
@@ -219,7 +225,7 @@ function App() {
       console.error("Failed to update name:", e);
       alert("Errore durante l'aggiornamento del nome.");
     }
-  };
+  }, [tempName, user]);
 
 
   /* ── Jutsu selection ────────────────────────── */
@@ -243,6 +249,7 @@ function App() {
     sequenceStepRef.current = step;
     sealHoldCountRef.current = 0;
     setStepFlash(false);
+    // eslint-disable-next-line react-hooks/purity -- intentional: called from event handlers only, not during render
     performanceStartTimeRef.current = performance.now();
     
     // Reset UI refs manually to ensure clean state
@@ -328,12 +335,12 @@ function App() {
     window.currentHandLandmarks = results.landmarks;
     if (!features) return;
 
-    if (mode === 'calibration') {
+    if (modeRef.current === 'calibration') {
       currentFeaturesBufferRef.current = features;
       return;
     }
 
-    if (mode === 'perform') {
+    if (modeRef.current === 'perform') {
       const jutsu = selectedJutsuRef.current;
       if (!jutsu) return;
       const targetSeal = jutsu.sequence[sequenceStepRef.current];
@@ -383,7 +390,7 @@ function App() {
         }
       }
     }
-  }, [mode]);
+  }, []);
 
   /* ── Battle Logic ───────────────────────────── */
   const pickRandomJutsuForBattle = useCallback(() => {
@@ -420,7 +427,7 @@ function App() {
       performanceStartTimeRef.current = performance.now();
       setMode('perform');
     }
-  }, [totalXp]);
+  }, [totalXp, setSelectedJutsu, setMode, setCalibrationQueue, setCalibrationIndex, setSequenceStep]);
 
   const startBattle = () => {
     const enemies = [
@@ -449,20 +456,18 @@ function App() {
   };
 
   useEffect(() => {
-    if (battle.active && battle.timer > 0 && mode !== 'effect') {
-      const t = setInterval(() => {
-        setBattle(prev => {
-          if (prev.timer <= 1) {
-            // User takes damage!
-            const newHp = Math.max(0, prev.userHp - 20);
-            return { ...prev, timer: 12, userHp: newHp, status: 'COLPITO!', damageFlash: true };
-          }
-          return { ...prev, timer: prev.timer - 1, damageFlash: false };
-        });
-      }, 1000);
-      return () => clearInterval(t);
-    }
-  }, [battle.active, battle.timer, mode]);
+    if (!battle.active || mode === 'effect') return;
+    const t = setInterval(() => {
+      setBattle(prev => {
+        if (prev.timer <= 1) {
+          const newHp = Math.max(0, prev.userHp - 20);
+          return { ...prev, timer: 12, userHp: newHp, status: 'COLPITO!', damageFlash: true };
+        }
+        return { ...prev, timer: prev.timer - 1, damageFlash: false };
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [battle.active, mode]);
 
   useEffect(() => {
     if (battle.active && battle.userHp <= 0) {
@@ -481,6 +486,7 @@ function App() {
           localStorage.setItem(STORAGE_KEY_XP, next.toString());
           return next;
         });
+        syncXpToCloud(totalXpRef.current + bonus);
         setLastXpEarned(bonus);
         setXpPopupTitle(`HAI SCONFITTO ${defeatedEnemy.toUpperCase()}!`);
         setShowXpPopup(true);
@@ -489,73 +495,61 @@ function App() {
         setTimeout(() => setShowXpPopup(false), 4000);
       }, 500);
     }
-  }, [battle.userHp, battle.enemyHp, battle.active]);
+  }, [battle.userHp, battle.enemyHp, battle.active, battle.enemy, syncXpToCloud]);
 
   /* ── Jutsu complete ─────────────────────────── */
   const handleJutsuComplete = useCallback(() => {
-    // Calculate XP
     const duration = (performance.now() - performanceStartTimeRef.current) / 1000;
     const jutsu = selectedJutsuRef.current;
-    
-    let isEnemyDefeated = false;
-
-    if (jutsu) {
-      const base = 50 + (jutsu.sequence.length * 10);
-      const speedBonus = Math.max(1, 1.5 - (duration / 20));
-      const earned = Math.round(base * speedBonus);
-      
-      setTotalXp(prev => {
-        const next = prev + earned;
-        localStorage.setItem(STORAGE_KEY_XP, next.toString());
-        syncXpToCloud(next);
-        return next;
-      });
-      setLastXpEarned(earned);
-      setXpPopupTitle('TECNICA COMPLETATA!');
-      setShowXpPopup(true);
-      setTimeout(() => setShowXpPopup(false), 3000);
-
-      const newEnemyHp = Math.max(0, battle.enemyHp - 25);
-      isEnemyDefeated = battle.active && jutsu.effectType !== 'heal' && newEnemyHp === 0;
-
-      // Battle Damage or Healing
-      setBattle(prev => {
-        if (prev.active) {
-          if (jutsu.effectType === 'heal') {
-            return {
-              ...prev,
-              userHp: Math.min(100, prev.userHp + 30),
-              timer: 12,
-              status: 'FERITE RIMARGINATE!'
-            };
-          } else {
-            return {
-              ...prev,
-              enemyHp: newEnemyHp,
-              timer: 12,
-              status: 'OTTIMO COLPO!'
-            };
-          }
-        }
-        return prev;
-      });
-    }
+    const currentBattle = battleRef.current; // always-fresh: avoids stale closure bug
 
     setActiveJutsu(null);
-      
-      // If in battle, pick the next move AUTOMATICALLY (only if enemy is not defeated)
-      if (battle.active && !isEnemyDefeated) {
-         setTimeout(() => {
-           pickRandomJutsuForBattle();
-         }, 800); // Shorter pause for higher pace
-      }
-
-      setMode(battle.active ? 'battle' : 'jutsu-select');
     setSelectedJutsu(null);
     selectedJutsuRef.current = null;
     setSequenceStep(0);
     sequenceStepRef.current = 0;
-  }, [battle.active, pickRandomJutsuForBattle, syncXpToCloud]);
+    setMode(currentBattle.active ? 'battle' : 'jutsu-select');
+
+    if (!jutsu) return;
+
+    const base = 50 + (jutsu.sequence.length * 10);
+    const speedBonus = Math.max(1, 1.5 - (duration / 20));
+    const earned = Math.round(base * speedBonus);
+    const newTotal = totalXpRef.current + earned;
+
+    setTotalXp(prev => {
+      const next = prev + earned;
+      localStorage.setItem(STORAGE_KEY_XP, next.toString());
+      return next;
+    });
+    syncXpToCloud(newTotal);
+
+    setLastXpEarned(earned);
+    setXpPopupTitle('TECNICA COMPLETATA!');
+    setShowXpPopup(true);
+    setTimeout(() => setShowXpPopup(false), 3000);
+
+    if (!currentBattle.active) return;
+
+    if (jutsu.effectType === 'heal') {
+      setBattle(prev => ({
+        ...prev,
+        userHp: Math.min(100, prev.userHp + 30),
+        timer: 12,
+        status: 'FERITE RIMARGINATE!'
+      }));
+      setTimeout(pickRandomJutsuForBattle, 800);
+      return;
+    }
+
+    const newEnemyHp = Math.max(0, currentBattle.enemyHp - 25);
+    setBattle(prev => ({ ...prev, enemyHp: newEnemyHp, timer: 12, status: 'OTTIMO COLPO!' }));
+
+    if (newEnemyHp > 0) {
+      setTimeout(pickRandomJutsuForBattle, 800);
+    }
+    // newEnemyHp === 0 → the battle.enemyHp useEffect handles victory
+  }, [pickRandomJutsuForBattle, syncXpToCloud, setSelectedJutsu, setMode]);
 
   /* ── Recalibration ──────────────────────────── */
   const toggleSeal = (name) => {
@@ -579,6 +573,8 @@ function App() {
   };
 
   /* ── Render ─────────────────────────────────── */
+  const currentRank = useMemo(() => getCurrentRank(totalXp), [totalXp]);
+  const nextRank = useMemo(() => getNextRank(totalXp), [totalXp]);
   const currentSealName = mode === 'calibration' ? calibrationQueue[calibrationIndex] : null;
   const calibrationPct = calibrationQueue.length
     ? Math.round((calibrationIndex / calibrationQueue.length) * 100) : 0;
@@ -590,7 +586,7 @@ function App() {
       <div className="sidebar-bg glass-panel" style={{ position: 'absolute', top: '1.25rem', left: '1.25rem', bottom: '1.25rem', width: '310px', zIndex: 1, pointerEvents: 'none' }}></div>
 
       {/* Decorative Kakashi (Between background and content) */}
-      <img src={`/assets/kakashi.png?v=${new Date().getTime()}`} className="deco-kakashi" style={{ zIndex: 2 }} alt="" />
+      <img src={`/assets/kakashi.png?v=${ASSET_V}`} className="deco-kakashi" style={{ zIndex: 2 }} alt="" />
 
       {/* ── Left Sidebar ─────────────────────── */}
       <div className="sidebar" style={{ width: '310px', flexShrink: 0, display: 'flex', flexDirection: 'column', padding: '1.5rem', gap: '1.25rem', overflowY: 'auto', zIndex: 10, position: 'relative' }}>
@@ -651,35 +647,36 @@ function App() {
         <div 
           className="glass-panel" 
           style={{ padding: '1rem', background: 'rgba(0,0,0,0.4)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
-          onClick={(e) => {
+          onClick={() => {
             const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
             if (!user || user.email !== ADMIN_EMAIL) return;
 
             const now = Date.now();
-            if (!window.rankClicks) window.rankClicks = [];
-            window.rankClicks = window.rankClicks.filter(t => now - t < 1000);
-            window.rankClicks.push(now);
-            if (window.rankClicks.length >= 3) {
+            rankClicksRef.current = rankClicksRef.current.filter(t => now - t < 1000);
+            rankClicksRef.current.push(now);
+            if (rankClicksRef.current.length >= 3) {
+              const bonus = 10000;
+              const newTotal = totalXpRef.current + bonus;
               setTotalXp(prev => {
-                const next = prev + 10000;
+                const next = prev + bonus;
                 localStorage.setItem(STORAGE_KEY_XP, next.toString());
-                syncXpToCloud(next);
                 return next;
               });
-              window.rankClicks = [];
-              alert("💥 ADMIN CHAKRA! Hai ottenuto 10.000 XP.");
+              syncXpToCloud(newTotal);
+              rankClicksRef.current = [];
+              alert("ADMIN CHAKRA! Hai ottenuto 10.000 XP.");
             }
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.6rem' }}>
             <div>
               <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.1em' }}>Grado Ninja</div>
-              <div style={{ 
-                fontFamily: 'var(--font-title)', fontSize: '1.5rem', 
-                color: getCurrentRank(totalXp).color, 
-                textShadow: `0 0 10px ${getCurrentRank(totalXp).color}44` 
+              <div style={{
+                fontFamily: 'var(--font-title)', fontSize: '1.5rem',
+                color: currentRank.color,
+                textShadow: `0 0 10px ${currentRank.color}44`
               }}>
-                {getCurrentRank(totalXp).name}
+                {currentRank.name}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -687,21 +684,21 @@ function App() {
               <div style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1rem' }}>{totalXp} XP</div>
             </div>
           </div>
-          
-          {getNextRank(totalXp) && (
+
+          {nextRank && (
             <>
               <div className="calibration-progress" style={{ height: '6px', background: 'rgba(255,255,255,0.05)' }}>
-                <div 
-                  className="calibration-progress-fill" 
-                  style={{ 
-                    width: `${((totalXp - getCurrentRank(totalXp).min) / (getNextRank(totalXp).min - getCurrentRank(totalXp).min)) * 100}%`,
-                    background: getCurrentRank(totalXp).color
-                  }} 
+                <div
+                  className="calibration-progress-fill"
+                  style={{
+                    width: `${((totalXp - currentRank.min) / (nextRank.min - currentRank.min)) * 100}%`,
+                    background: currentRank.color
+                  }}
                 />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-                <span>{getCurrentRank(totalXp).min}</span>
-                <span>Prossimo Grado: {getNextRank(totalXp).name} ({getNextRank(totalXp).min})</span>
+                <span>{currentRank.min}</span>
+                <span>Prossimo Grado: {nextRank.name} ({nextRank.min})</span>
               </div>
             </>
           )}
@@ -1060,13 +1057,13 @@ function App() {
         )}
 
         {/* Naruto Logo (Now inside webcam) */}
-        <img src={`/assets/naruto_logo.png?v=${new Date().getTime()}`} className="deco-logo" alt="Naruto Logo" />
+        <img src={`/assets/naruto_logo.png?v=${ASSET_V}`} className="deco-logo" alt="Naruto Logo" />
 
         <WebcamView onResults={handleWebcamResults} currentSong={currentSong} />
 
         {/* Decorative Sasuke & Naruto (Clipped inside webcam frame) */}
-        <img src={`/assets/sasuke.png?v=${new Date().getTime()}`} className="deco-sasuke" alt="" />
-        <img src={`/assets/naruto.png?v=${new Date().getTime()}`} className="deco-naruto" alt="" />
+        <img src={`/assets/sasuke.png?v=${ASSET_V}`} className="deco-sasuke" alt="" />
+        <img src={`/assets/naruto.png?v=${ASSET_V}`} className="deco-naruto" alt="" />
 
         
         {/* ── Jutsu Effect (Nested) ── */}
@@ -1125,7 +1122,7 @@ function App() {
       {/* ── Leaderboard Overlay ── */}
       {mode === 'leaderboard' && (
         <Leaderboard 
-          currentPlayer={{ uid: user?.uid, name: playerName, xp: totalXp, rank: getCurrentRank(totalXp).name, photo: user?.photoURL }}
+          currentPlayer={{ uid: user?.uid, name: playerName, xp: totalXp, rank: currentRank.name, photo: user?.photoURL }}
           onBack={() => setMode('jutsu-select')}
         />
       )}

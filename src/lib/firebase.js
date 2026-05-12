@@ -16,7 +16,15 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const analytics = getAnalytics(app);
+
+let analytics = null;
+try {
+  analytics = getAnalytics(app);
+} catch {
+  // Analytics blocked by browser or unavailable (e.g. ad blockers, SSR)
+}
+export { analytics };
+
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);
