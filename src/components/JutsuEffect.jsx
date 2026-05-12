@@ -103,6 +103,47 @@ const playSound = (type, audioCtx, volume = 0.5) => {
           osc2.start(); osc2.stop(audioCtx.currentTime + 0.3);
         }, 200 + i * 300);
       }
+    } else if (type === 'sharingan') {
+      // Low ominous drone
+      const drone = audioCtx.createOscillator();
+      drone.type = 'sine'; drone.frequency.value = 55;
+      const droneGain = audioCtx.createGain();
+      droneGain.gain.setValueAtTime(0, audioCtx.currentTime);
+      droneGain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 1.2);
+      droneGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 6);
+      drone.connect(droneGain); droneGain.connect(dst);
+      drone.start(); drone.stop(audioCtx.currentTime + 6);
+      // Hypnotic shimmer with vibrato
+      const shimmer = audioCtx.createOscillator();
+      shimmer.type = 'sine'; shimmer.frequency.value = 880;
+      const lfo = audioCtx.createOscillator();
+      lfo.type = 'sine'; lfo.frequency.value = 5;
+      const lfoDepth = audioCtx.createGain(); lfoDepth.gain.value = 35;
+      lfo.connect(lfoDepth); lfoDepth.connect(shimmer.frequency);
+      const shimmerGain = audioCtx.createGain();
+      shimmerGain.gain.setValueAtTime(0, audioCtx.currentTime);
+      shimmerGain.gain.linearRampToValueAtTime(0.07, audioCtx.currentTime + 0.8);
+      shimmerGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 5.5);
+      shimmer.connect(shimmerGain); shimmerGain.connect(dst);
+      lfo.start(); shimmer.start();
+      lfo.stop(audioCtx.currentTime + 5.5); shimmer.stop(audioCtx.currentTime + 5.5);
+      // Crow caw bursts
+      for (let i = 0; i < 5; i++) {
+        setTimeout(() => {
+          const bSz = audioCtx.sampleRate * 0.25;
+          const buf = audioCtx.createBuffer(1, bSz, audioCtx.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let j = 0; j < bSz; j++) d[j] = (Math.random() * 2 - 1) * 0.4;
+          const src = audioCtx.createBufferSource(); src.buffer = buf;
+          const flt = audioCtx.createBiquadFilter(); flt.type = 'bandpass';
+          flt.frequency.value = 900 + Math.random() * 700; flt.Q.value = 12;
+          const gn = audioCtx.createGain();
+          gn.gain.setValueAtTime(0.18, audioCtx.currentTime);
+          gn.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+          src.connect(flt); flt.connect(gn); gn.connect(dst);
+          src.start();
+        }, 600 + i * 900 + Math.random() * 300);
+      }
     }
   } catch { /* ignore */ }
 };
@@ -434,6 +475,166 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
     }
   }, [updateSegmentation]);
 
+  const renderSharingan = useCallback((ctx, w, h, t, crows) => {
+    ctx.clearRect(0, 0, w, h);
+    const video = window.currentVideoElement;
+    const segmenter = window.currentSegmenter;
+
+    // Dark crimson background
+    ctx.fillStyle = 'rgba(4,0,8,1)';
+    ctx.fillRect(0, 0, w, h);
+
+    // Composite user silhouette (red-tinted, like susanoo)
+    if (video && segmenter) updateSegmentation(video, segmenter, video.videoWidth || w, video.videoHeight || h);
+    if (video && isSegmentingRef.current && userCanvasRef.current) {
+      ctx.save();
+      ctx.globalAlpha = 0.75;
+      ctx.filter = 'sepia(1) saturate(6) hue-rotate(320deg)';
+      ctx.drawImage(userCanvasRef.current, 0, 0, w, h);
+      ctx.filter = 'none';
+      ctx.restore();
+    } else if (video && video.readyState >= 2) {
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      ctx.filter = 'sepia(1) saturate(4) hue-rotate(320deg)';
+      ctx.drawImage(video, 0, 0, w, h);
+      ctx.filter = 'none';
+      ctx.restore();
+    }
+
+    // Red radial vignette
+    const vig = ctx.createRadialGradient(w/2, h/2, h*0.1, w/2, h/2, h*0.9);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(60,0,0,0.92)');
+    ctx.fillStyle = vig; ctx.fillRect(0, 0, w, h);
+
+    // Subtle chakra tendrils from face center
+    const fcx = w/2, fcy = h * 0.33;
+    ctx.save();
+    ctx.globalAlpha = 0.12 + 0.06 * Math.sin(t * 0.06);
+    ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + t * 0.008;
+      const len = 120 + 60 * Math.sin(t * 0.05 + i * 0.9);
+      ctx.beginPath();
+      ctx.moveTo(fcx, fcy);
+      ctx.lineTo(fcx + Math.cos(a) * len, fcy + Math.sin(a) * len);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // === Sharingan Eyes ===
+    const fadeIn = Math.min(1, Math.max(0, (t - 8) / 18));
+    const eyeSpacing = w * 0.096;
+    const eyeR = Math.min(w, h) * 0.048;
+    const rotation = t * 0.022;
+
+    for (let side = -1; side <= 1; side += 2) {
+      const ex = fcx + side * eyeSpacing;
+      const ey = fcy;
+      ctx.globalAlpha = fadeIn;
+
+      // Outer pulsing halo
+      const pulse = 1 + 0.18 * Math.sin(t * 0.1);
+      const halo = ctx.createRadialGradient(ex, ey, 0, ex, ey, eyeR * 2.8 * pulse);
+      halo.addColorStop(0, 'rgba(220,30,30,0.55)');
+      halo.addColorStop(0.5, 'rgba(180,0,0,0.18)');
+      halo.addColorStop(1, 'rgba(180,0,0,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(ex, ey, eyeR * 2.8 * pulse, 0, Math.PI*2); ctx.fill();
+
+      // Eyelid shape (white ellipse background)
+      ctx.fillStyle = 'rgba(8,0,0,0.95)';
+      ctx.beginPath(); ctx.ellipse(ex, ey, eyeR * 1.55, eyeR * 1.0, 0, 0, Math.PI*2); ctx.fill();
+
+      // Red iris
+      const irisG = ctx.createRadialGradient(ex - eyeR*0.15, ey - eyeR*0.15, 0, ex, ey, eyeR);
+      irisG.addColorStop(0, '#ff3300');
+      irisG.addColorStop(0.55, '#cc0000');
+      irisG.addColorStop(1, '#550000');
+      ctx.fillStyle = irisG;
+      ctx.beginPath(); ctx.arc(ex, ey, eyeR, 0, Math.PI*2); ctx.fill();
+
+      // Three tomoe (rotating comma shapes)
+      for (let i = 0; i < 3; i++) {
+        const ta = rotation + (i / 3) * Math.PI * 2;
+        const orbit = eyeR * 0.52;
+        const tx_ = ex + Math.cos(ta) * orbit;
+        const ty_ = ey + Math.sin(ta) * orbit;
+        const tr = eyeR * 0.19;
+        // Teardrop body
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(tx_, ty_, tr, 0, Math.PI*2); ctx.fill();
+        // Comma tail sweeping toward center
+        const tailA = ta + Math.PI * 0.55;
+        const tailCx = ex + Math.cos(ta) * orbit * 0.62;
+        const tailCy = ey + Math.sin(ta) * orbit * 0.62;
+        ctx.beginPath();
+        ctx.arc(tailCx, tailCy, eyeR * 0.14, tailA, tailA + Math.PI * 1.1);
+        ctx.fill();
+      }
+
+      // Dark pupil with faint red shine
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(ex, ey, eyeR * 0.27, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,80,80,0.35)';
+      ctx.beginPath(); ctx.arc(ex - eyeR*0.07, ey - eyeR*0.09, eyeR * 0.09, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // === Crows ===
+    const crowFade = Math.min(1, Math.max(0, (t - 25) / 20));
+    if (crowFade > 0) {
+      ctx.globalAlpha = crowFade;
+      crows.forEach(crow => {
+        crow.angle += crow.speed;
+        crow.wingPhase += 0.2;
+        const cx_ = w/2 + Math.cos(crow.angle) * crow.orbitX;
+        const cy_ = h * 0.38 + Math.sin(crow.angle) * crow.orbitY;
+        const flightDir = crow.angle + (crow.speed > 0 ? Math.PI/2 : -Math.PI/2);
+        const wing = Math.sin(crow.wingPhase) * 0.45;
+        const sz = crow.size;
+        ctx.save();
+        ctx.translate(cx_, cy_);
+        ctx.rotate(flightDir);
+        ctx.fillStyle = '#0a0000';
+        ctx.shadowBlur = 10; ctx.shadowColor = '#dc2626';
+        // Body
+        ctx.beginPath(); ctx.ellipse(0, 0, sz * 1.1, sz * 0.38, 0, 0, Math.PI*2); ctx.fill();
+        // Head
+        ctx.beginPath(); ctx.arc(sz * 0.85, -sz * 0.12, sz * 0.32, 0, Math.PI*2); ctx.fill();
+        // Beak
+        ctx.beginPath();
+        ctx.moveTo(sz * 1.15, -sz * 0.18); ctx.lineTo(sz * 1.55, -sz * 0.04); ctx.lineTo(sz * 1.15, sz * 0.04);
+        ctx.closePath(); ctx.fill();
+        // Left wing (flapping up)
+        ctx.save(); ctx.rotate(-wing);
+        ctx.beginPath();
+        ctx.moveTo(-sz * 0.1, 0);
+        ctx.bezierCurveTo(-sz * 0.4, -sz * 1.1, -sz * 1.4, -sz * 0.75, -sz * 1.9, -sz * 0.25);
+        ctx.bezierCurveTo(-sz * 1.1, -sz * 0.05, -sz * 0.4, sz * 0.08, -sz * 0.1, 0);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+        // Right wing (flapping down)
+        ctx.save(); ctx.rotate(wing);
+        ctx.beginPath();
+        ctx.moveTo(-sz * 0.1, 0);
+        ctx.bezierCurveTo(-sz * 0.4, sz * 1.1, -sz * 1.4, sz * 0.75, -sz * 1.9, sz * 0.25);
+        ctx.bezierCurveTo(-sz * 1.1, sz * 0.05, -sz * 0.4, -sz * 0.08, -sz * 0.1, 0);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+        // Tail
+        ctx.beginPath();
+        ctx.moveTo(-sz * 0.7, 0); ctx.lineTo(-sz * 1.4, -sz * 0.28);
+        ctx.lineTo(-sz * 1.55, sz * 0.0); ctx.lineTo(-sz * 1.4, sz * 0.28);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      });
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+    }
+  }, [updateSegmentation]);
+
   const renderPush = useCallback((_ctx, w, h, tx, ty, frame) => {
     _ctx.clearRect(0, 0, w, h);
     const progress = (frame % 30) / 30, radius = progress * 800;
@@ -481,6 +682,14 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
     else if (type === 'water') particlesRef.current = Array.from({ length: 40 }, () => ({ x: cx, y: cy, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10 - 5, life: Math.random()*0.8+0.2, size: Math.random()*8+4, color: '#3b82f6' }));
     else if (type === 'shadow') clonesRef.current = [-200, -120, 120, 200].map(offset => ({ x: cx+offset, y: cy, spawnTime: 30+Math.abs(offset)*0.3 }));
     else if (type === 'heal') particlesRef.current = Array.from({ length: 35 }, () => ({ x: cx+(Math.random()-0.5)*100, y: cy+(Math.random()-0.5)*100, speed: 1+Math.random()*2, life: Math.random(), size: 2+Math.random()*4, color: '#10B981' }));
+    else if (type === 'sharingan') particlesRef.current = Array.from({ length: 14 }, (_, i) => ({
+      angle: (i / 14) * Math.PI * 2,
+      orbitX: 90 + (i % 3) * 80,
+      orbitY: 45 + (i % 3) * 40,
+      speed: (0.011 + (i % 4) * 0.004) * (i % 2 === 0 ? 1 : -1),
+      wingPhase: Math.random() * Math.PI * 2,
+      size: 7 + Math.random() * 7,
+    }));
   }, []);
 
   useEffect(() => {
@@ -535,17 +744,19 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
         case 'susanoo': renderSusanoo(ctx, w, h, frameRef.current); break;
         case 'push': renderPush(ctx, w, h, tx, ty, frameRef.current); break;
         case 'heal': renderHeal(ctx, w, h, usedHand, t, particlesRef.current); break;
+        case 'sharingan': renderSharingan(ctx, w, h, t, particlesRef.current); break;
       }
       rafRef.current = requestAnimationFrame(loop);
     };
     loop();
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [jutsu, initParticles, summonedAnimal, handLandmarks, renderChidori, renderRasengan, renderKaton, renderShadow, renderClone, renderSummon, renderWater, renderSusanoo, renderPush, renderHeal]);
+  }, [jutsu, initParticles, summonedAnimal, handLandmarks, renderChidori, renderRasengan, renderKaton, renderShadow, renderClone, renderSummon, renderWater, renderSusanoo, renderPush, renderHeal, renderSharingan]);
 
   if (!jutsu) return null;
 
-  const bgMap = { lightning: 'rgba(0,5,20,0.85)', wind: 'rgba(0,5,20,0.85)', fire: 'rgba(10,0,0,0.88)', shadow: 'rgba(0,0,10,0.88)', clone: 'rgba(0,0,0,0.0)' };
-  const canvasStyle = jutsu.effectType === 'clone' ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : { position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'scaleX(-1)' };
+  const bgMap = { lightning: 'rgba(0,5,20,0.85)', wind: 'rgba(0,5,20,0.85)', fire: 'rgba(10,0,0,0.88)', shadow: 'rgba(0,0,10,0.88)', clone: 'rgba(0,0,0,0.0)', sharingan: 'rgba(4,0,8,1)' };
+  const noFlip = jutsu.effectType === 'clone' || jutsu.effectType === 'sharingan';
+  const canvasStyle = noFlip ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : { position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'scaleX(-1)' };
 
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 8, pointerEvents: 'none', background: bgMap[jutsu.effectType] || 'rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 'inherit' }}>
