@@ -228,11 +228,13 @@ function App() {
           } else {
             // Create user in Firestore — use XP already in state (from lazy localStorage init)
             const localXp = totalXpRef.current;
+            const isAdmin = firebaseUser.email === import.meta.env.VITE_ADMIN_EMAIL;
             await setDoc(userRef, {
               name: firebaseUser.displayName,
               xp: localXp,
               rank: getCurrentRank(localXp).name,
               photo: firebaseUser.photoURL,
+              isHidden: isAdmin,
               lastSeen: new Date()
             });
           }
@@ -274,6 +276,7 @@ function App() {
           xp: newTotal,
           rank: getCurrentRank(newTotal).name,
           mastery: jutsuMasteryRef.current,
+          isHidden: user.email === import.meta.env.VITE_ADMIN_EMAIL,
           lastSeen: new Date()
         }, { merge: true });
       } catch (e) {
@@ -506,7 +509,8 @@ function App() {
     setBattle({
       active: true,
       enemy: selectedEnemyId,
-      userHp: 100,
+      userHp: currentRank.maxHp,
+      userMaxHp: currentRank.maxHp,
       enemyHp: bossData.maxHp,
       enemyMaxHp: bossData.maxHp,
       timer: 12,
@@ -526,13 +530,17 @@ function App() {
           const dmg = boss?.specialDamage ?? 20;
           const newHp = Math.max(0, prev.userHp - dmg);
           const status = boss ? `${boss.specialAttack}! -${dmg} HP` : 'COLPITO!';
+          
+          // Se scade il tempo, cambia tecnica come richiesto
+          setTimeout(pickRandomJutsuForBattle, 0);
+          
           return { ...prev, timer: 12, userHp: newHp, status, damageFlash: true };
         }
         return { ...prev, timer: prev.timer - 1, damageFlash: false };
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [battle.active, mode]);
+  }, [battle.active, mode, pickRandomJutsuForBattle]);
 
   useEffect(() => {
     if (battle.active && battle.userHp <= 0) {
@@ -628,7 +636,7 @@ function App() {
     if (!currentBattle.active) return;
 
     if (jutsu.effectType === 'heal') {
-      setBattle(prev => ({ ...prev, userHp: Math.min(100, prev.userHp + 30), timer: 12, status: 'FERITE RIMARGINATE!' }));
+      setBattle(prev => ({ ...prev, userHp: Math.min(prev.userMaxHp || 100, prev.userHp + 30), timer: 12, status: 'FERITE RIMARGINATE!' }));
       setTimeout(pickRandomJutsuForBattle, 800);
       return;
     }
@@ -636,7 +644,7 @@ function App() {
     // ── Boss damage (mastery + weakness bonus) ──
     const bossData = BOSSES[currentBattle.enemy];
     const masteryLvl = getMasteryLevel(newMastery[jutsu.id] || 0).level;
-    const baseDmg = 20 + masteryLvl * 5;
+    const baseDmg = (jutsu.damage || 20) + masteryLvl * 5;
     const weaknessBonus = bossData?.weakness === jutsu.effectType ? 15 : 0;
     const damage = baseDmg + weaknessBonus;
     const newEnemyHp = Math.max(0, currentBattle.enemyHp - damage);
@@ -1235,11 +1243,11 @@ function App() {
             {/* User HP Bar */}
             <div style={{ position: 'absolute', bottom: '100px', left: '50%', transform: 'translateX(-50%)', width: '50%', zIndex: 100 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#fff', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                <span>Tu (Salute)</span>
-                <span>{battle.userHp}%</span>
+                <span>Tu ({currentRank.name})</span>
+                <span>{battle.userHp} / {battle.userMaxHp} HP</span>
               </div>
               <div className="calibration-progress" style={{ height: '8px', background: 'rgba(0,0,0,0.6)' }}>
-                <div className="calibration-progress-fill" style={{ width: `${battle.userHp}%`, background: 'linear-gradient(90deg, #22c55e, #15803d)' }} />
+                <div className="calibration-progress-fill" style={{ width: `${(battle.userHp / (battle.userMaxHp || 100)) * 100}%`, background: 'linear-gradient(90deg, #22c55e, #15803d)' }} />
               </div>
             </div>
 
@@ -1353,6 +1361,7 @@ function App() {
       {mode === 'leaderboard' && (
         <Leaderboard
           currentPlayer={{ uid: user?.uid, name: playerName, xp: totalXp, rank: currentRank.name, photo: user?.photoURL }}
+          isHidden={user?.email === import.meta.env.VITE_ADMIN_EMAIL}
           onBack={() => setMode('jutsu-select')}
         />
       )}

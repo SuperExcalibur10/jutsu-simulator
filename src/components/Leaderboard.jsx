@@ -2,17 +2,16 @@ import { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
-const Leaderboard = ({ currentPlayer, onBack }) => {
+const Leaderboard = ({ currentPlayer, isHidden, onBack }) => {
   const [realPlayers, setRealPlayers] = useState([]);
 
   useEffect(() => {
     // Listen to top 20 players from Firestore
     const q = query(collection(db, "players"), orderBy("xp", "desc"), limit(20));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const players = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const players = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(p => !p.isHidden);
       setRealPlayers(players);
     });
 
@@ -29,8 +28,8 @@ const Leaderboard = ({ currentPlayer, onBack }) => {
     isCurrent: rp.id === currentPlayer?.uid
   }));
 
-  // Assicuriamoci che il giocatore corrente sia sempre visibile, anche se non in top 20
-  if (currentPlayer && currentPlayer.uid && !allPlayers.some(p => p.id === currentPlayer.uid)) {
+  // Assicuriamoci che il giocatore corrente sia sempre visibile, solo se non è un admin/nascosto
+  if (currentPlayer && currentPlayer.uid && !isHidden && !allPlayers.some(p => p.id === currentPlayer.uid)) {
     allPlayers.push({
       id: currentPlayer.uid,
       name: currentPlayer.name,
