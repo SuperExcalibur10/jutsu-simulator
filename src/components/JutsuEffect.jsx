@@ -619,7 +619,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
         ctx.save();
         ctx.translate(ex, ey);
         ctx.rotate(rotation);
-        const size = eyeR * 3.5;
+        const size = eyeR * 2.2;
         ctx.drawImage(sharinganImg, -size / 2, -size / 2, size, size);
         ctx.restore();
       }
@@ -702,8 +702,8 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
     else if (type === 'heal') particlesRef.current = Array.from({ length: 35 }, () => ({ x: cx+(Math.random()-0.5)*100, y: cy+(Math.random()-0.5)*100, speed: 1+Math.random()*2, life: Math.random(), size: 2+Math.random()*4, color: '#10B981' }));
     else if (type === 'sharingan') particlesRef.current = Array.from({ length: 14 }, (_, i) => ({
       angle: (i / 14) * Math.PI * 2,
-      orbitX: 90 + (i % 3) * 80,
-      orbitY: 45 + (i % 3) * 40,
+      orbitX: 180 + (i % 3) * 120,
+      orbitY: 100 + (i % 3) * 60,
       speed: (0.011 + (i % 4) * 0.004) * (i % 2 === 0 ? 1 : -1),
       wingPhase: Math.random() * Math.PI * 2,
       size: 24 + Math.random() * 18,
