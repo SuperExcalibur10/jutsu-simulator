@@ -159,11 +159,11 @@ export const JUTSUS = {
     subtitle: "Freccia di Indra",
     character: 'Sasuke · Clan Uchiha',
     sequence: ['Bue', 'Serpente', 'Tigre', 'Lepre', 'Uccello'],
-    effectType: 'lightning',
+    effectType: 'indra',
     color: '#38BDF8',
     glowColor: 'rgba(56,189,248,0.8)',
     kanji: 'インドラの矢',
-    imageId: 'sasuke_indra',
+    imageId: 'sasuke',
     damage: 200,
     minXp: 15000
   }

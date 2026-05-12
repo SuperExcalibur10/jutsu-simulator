@@ -664,6 +664,27 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
     _ctx.restore();
   }, []);
 
+  const renderIndra = useCallback((ctx, w, h, t, hand, particles) => {
+    ctx.clearRect(0, 0, w, h);
+    const cx = hand[9].x * w, cy = hand[9].y * h;
+    const flash = 0.1 + 0.1 * Math.sin(t * 0.5);
+    ctx.fillStyle = `rgba(255,255,255,${flash})`;
+    ctx.fillRect(0,0,w,h);
+    
+    // Supplementary lightning sparks
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+      p.x += p.vx; p.y += p.vy;
+      p.vy += 0.2; p.life -= 0.03;
+      if (p.life <= 0) {
+        particles[i] = { x: cx + (Math.random()-0.5)*100, y: cy + (Math.random()-0.5)*100, vx: (Math.random()-0.5)*20, vy: (Math.random()-0.5)*20, life: 0.5+Math.random()*0.5, size: 2+Math.random()*4, color: '#38BDF8' };
+      }
+    }
+  }, []);
+
   const renderShadow = useCallback((ctx, w, h, _hand, t, clones) => {
     ctx.clearRect(0, 0, w, h);
     // const _cx = hand[9].x * w, _cy = hand[9].y * h;
@@ -709,6 +730,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
       wingPhase: Math.random() * Math.PI * 2,
       size: 24 + Math.random() * 18,
     }));
+    else if (type === 'indra') particlesRef.current = Array.from({ length: 25 }, () => ({ x: cx, y: cy, vx: (Math.random()-0.5)*20, vy: (Math.random()-0.5)*20, life: Math.random(), size: 2+Math.random()*4, color: '#fff' }));
   }, []);
 
   useEffect(() => {
@@ -764,6 +786,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
         case 'push': renderPush(ctx, w, h, tx, ty, frameRef.current); break;
         case 'heal': renderHeal(ctx, w, h, usedHand, t, particlesRef.current); break;
         case 'sharingan': renderSharingan(ctx, w, h, t, particlesRef.current); break;
+        case 'indra': renderIndra(ctx, w, h, t, usedHand, particlesRef.current); break;
       }
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -773,13 +796,30 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
 
   if (!jutsu) return null;
 
-  const bgMap = { lightning: 'rgba(0,5,20,0.85)', wind: 'rgba(0,5,20,0.85)', fire: 'rgba(10,0,0,0.88)', shadow: 'rgba(0,0,10,0.88)', clone: 'rgba(0,0,0,0.0)', sharingan: 'rgba(4,0,8,1)' };
+  const bgMap = { lightning: 'rgba(0,5,20,0.85)', wind: 'rgba(0,5,20,0.85)', fire: 'rgba(10,0,0,0.88)', shadow: 'rgba(0,0,10,0.88)', clone: 'rgba(0,0,0,0.0)', sharingan: 'rgba(4,0,8,1)', indra: 'rgba(0,0,20,0.7)' };
   const noFlip = jutsu.effectType === 'clone' || jutsu.effectType === 'sharingan';
   const canvasStyle = noFlip ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : { position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'scaleX(-1)' };
 
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 8, pointerEvents: 'none', background: bgMap[jutsu.effectType] || 'rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 'inherit' }}>
       <canvas ref={canvasRef} width={window.currentVideoElement?.videoWidth || 640} height={window.currentVideoElement?.videoHeight || 480} style={canvasStyle} />
+      
+      {jutsu.effectType === 'indra' && (
+        <img 
+          src="/effects/freccia_di_indra.gif" 
+          alt="" 
+          style={{ 
+            position: 'absolute', 
+            inset: 0, 
+            width: '100%', 
+            height: '100%', 
+            objectFit: 'cover', 
+            mixBlendMode: 'screen',
+            opacity: 0.8,
+            zIndex: 5
+          }} 
+        />
+      )}
       <div style={{ position: 'relative', zIndex: 60, textAlign: 'center', pointerEvents: 'none', animation: 'jutsuReveal 0.5s ease-out' }}>
         <div style={{ fontFamily: 'var(--font-title)', fontSize: '3.5rem', letterSpacing: '0.12em', color: jutsu.color, filter: `drop-shadow(0 0 30px ${jutsu.glowColor}) drop-shadow(0 0 60px ${jutsu.glowColor})`, textShadow: `0 0 40px ${jutsu.glowColor}`, animation: 'jutsuPulse 0.8s ease-in-out infinite alternate' }}>{jutsu.name}</div>
         <div style={{ fontSize: '5rem', color: jutsu.color, opacity: 0.6, fontFamily: 'serif', lineHeight: 1, filter: `drop-shadow(0 0 20px ${jutsu.glowColor})` }}>{jutsu.kanji}</div>
