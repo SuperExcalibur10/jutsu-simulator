@@ -2,18 +2,27 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import WebcamView from './components/WebcamView';
 import JutsuEffect from './components/JutsuEffect';
 import Leaderboard from './components/Leaderboard';
+import ProfileStats from './components/ProfileStats';
 import { auth, googleProvider, db } from './lib/firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { extractFeatures, classifySeal } from './utils/sealClassifier';
-import { JUTSUS, SEALS_LIST } from './utils/jutsuEngine';
-import { getCurrentRank, getNextRank } from './utils/progression';
+import { JUTSUS, SEALS_LIST, BOSSES } from './utils/jutsuEngine';
+import { getCurrentRank, getNextRank, getMasteryLevel } from './utils/progression';
+import { ACHIEVEMENTS } from './utils/achievements';
 
 const ASSET_V = Date.now(); // stable cache-bust token — computed once at module load
 
 const SEAL_HOLD_FRAMES = 10;
 const STORAGE_KEY_SEALS = 'jutsu_sim_v4_seals';
 const STORAGE_KEY_XP = 'jutsu_sim_v4_xp';
+const STORAGE_KEY_MASTERY = 'jutsu_sim_v4_mastery';
+const STORAGE_KEY_ACHIEVEMENTS = 'jutsu_sim_v4_achievements';
+const STORAGE_KEY_STATS = 'jutsu_sim_v4_stats';
+const STORAGE_KEY_VOLUME = 'jutsu_sim_v4_volume';
+
+const DEFAULT_STATS = { totalJutsus: 0, wins: 0, losses: 0, jutsuCounts: {}, fastestJutsu: null };
+const DEFAULT_VOLUME = { music: 0.25, effects: 0.5 };
 
 const BACKGROUND_MUSIC = [
   { title: "Blue Bird", file: "/sounds/Blue Bird.mp3" },
@@ -56,6 +65,27 @@ function App() {
   const [xpPopupTitle, setXpPopupTitle] = useState('TECNICA COMPLETATA!');
   const performanceStartTimeRef = useRef(0);
 
+  /* ── Mastery / Achievements / Stats ────────────── */
+  const [jutsuMastery, setJutsuMastery] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_MASTERY) || '{}'); } catch { return {}; }
+  });
+  const [achievements, setAchievements] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_ACHIEVEMENTS) || '[]'); } catch { return []; }
+  });
+  const [stats, setStats] = useState(() => {
+    try { return { ...DEFAULT_STATS, ...JSON.parse(localStorage.getItem(STORAGE_KEY_STATS) || '{}') }; } catch { return DEFAULT_STATS; }
+  });
+  const [newAchievement, setNewAchievement] = useState(null);
+
+  /* ── Volume ─────────────────────────────────────── */
+  const [volume, setVolume] = useState(() => {
+    try { return { ...DEFAULT_VOLUME, ...JSON.parse(localStorage.getItem(STORAGE_KEY_VOLUME) || '{}') }; } catch { return DEFAULT_VOLUME; }
+  });
+  const [showVolumePanel, setShowVolumePanel] = useState(false);
+
+  /* ── Connectivity ───────────────────────────────── */
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
   /* ── Battle state ───────────────────────────── */
   const [battle, setBattle] = useState({
     active: false,
@@ -96,6 +126,9 @@ function App() {
   const modeRef = useRef(mode);
   const totalXpRef = useRef(totalXp);
   const rankClicksRef = useRef([]);
+  const jutsuMasteryRef = useRef(jutsuMastery);
+  const achievementsRef = useRef(achievements);
+  const statsRef = useRef(stats);
 
   /* ── Keep refs in sync ──────────────────────── */
   useEffect(() => { calibratedSealsRef.current = calibratedSeals; }, [calibratedSeals]);
@@ -104,6 +137,9 @@ function App() {
   useEffect(() => { battleRef.current = battle; }, [battle]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => { totalXpRef.current = totalXp; }, [totalXp]);
+  useEffect(() => { jutsuMasteryRef.current = jutsuMastery; }, [jutsuMastery]);
+  useEffect(() => { achievementsRef.current = achievements; }, [achievements]);
+  useEffect(() => { statsRef.current = stats; }, [stats]);
 
   /* ── Music Logic ────────────────────────────── */
   useEffect(() => {
@@ -134,6 +170,39 @@ function App() {
       audio.src = '';
     };
   }, []);
+  /* ── Volume sync ───────────────────────────── */
+  useEffect(() => { audioRef.current.volume = volume.music; }, [volume.music]);
+
+  /* ── Online / Offline ───────────────────────── */
+  useEffect(() => {
+    const up = () => setIsOnline(true);
+    const down = () => setIsOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, []);
+
+  /* ── Achievement helper ─────────────────────── */
+  const unlockAchievement = useCallback((id) => {
+    if (achievementsRef.current.includes(id)) return;
+    const updated = [...achievementsRef.current, id];
+    setAchievements(updated);
+    achievementsRef.current = updated;
+    localStorage.setItem(STORAGE_KEY_ACHIEVEMENTS, JSON.stringify(updated));
+    const ach = ACHIEVEMENTS.find(a => a.id === id);
+    if (ach) setNewAchievement(ach);
+  }, [setAchievements, setNewAchievement]);
+
+  /* ── Achievement: all seals calibrated ──────── */
+  useEffect(() => {
+    if (Object.keys(calibratedSeals).length >= SEALS_LIST.length) unlockAchievement('seal_calibrator');
+  }, [calibratedSeals, unlockAchievement]);
+
+  /* ── Achievement: XP rank milestones ─────────── */
+  useEffect(() => {
+    if (totalXp >= 7000) unlockAchievement('kage_rank');
+  }, [totalXp, unlockAchievement]);
+
   /* ── Init: Firebase Auth Listener ──────────── */
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -204,6 +273,7 @@ function App() {
         await setDoc(userRef, {
           xp: newTotal,
           rank: getCurrentRank(newTotal).name,
+          mastery: jutsuMasteryRef.current,
           lastSeen: new Date()
         }, { merge: true });
       } catch (e) {
@@ -430,28 +500,20 @@ function App() {
   }, [totalXp, setSelectedJutsu, setMode, setCalibrationQueue, setCalibrationIndex, setSequenceStep]);
 
   const startBattle = () => {
-    const enemies = [
-      { id: 'orochimaru', minXp: 0 },
-      { id: 'pain', minXp: 1000 },
-      { id: 'obito', minXp: 3000 },
-      { id: 'madara', minXp: 7000 },
-      { id: 'kaguya', minXp: 9000 }
-    ];
-    
-    // Filter enemies by player XP
-    const availableEnemies = enemies.filter(e => totalXp >= e.minXp);
-    const selectedEnemy = availableEnemies[Math.floor(Math.random() * availableEnemies.length)].id;
-    
+    const availableEnemies = Object.entries(BOSSES).filter(([, b]) => totalXp >= b.minXp);
+    const [selectedEnemyId, bossData] = availableEnemies[Math.floor(Math.random() * availableEnemies.length)];
+
     setBattle({
       active: true,
-      enemy: selectedEnemy,
+      enemy: selectedEnemyId,
       userHp: 100,
-      enemyHp: 100,
+      enemyHp: bossData.maxHp,
+      enemyMaxHp: bossData.maxHp,
       timer: 12,
       status: 'PREPARATI AL COMBATTIMENTO!',
       damageFlash: false
     });
-    
+
     setMode('battle');
   };
 
@@ -460,8 +522,11 @@ function App() {
     const t = setInterval(() => {
       setBattle(prev => {
         if (prev.timer <= 1) {
-          const newHp = Math.max(0, prev.userHp - 20);
-          return { ...prev, timer: 12, userHp: newHp, status: 'COLPITO!', damageFlash: true };
+          const boss = BOSSES[prev.enemy];
+          const dmg = boss?.specialDamage ?? 20;
+          const newHp = Math.max(0, prev.userHp - dmg);
+          const status = boss ? `${boss.specialAttack}! -${dmg} HP` : 'COLPITO!';
+          return { ...prev, timer: 12, userHp: newHp, status, damageFlash: true };
         }
         return { ...prev, timer: prev.timer - 1, damageFlash: false };
       });
@@ -472,6 +537,9 @@ function App() {
   useEffect(() => {
     if (battle.active && battle.userHp <= 0) {
       setTimeout(() => {
+        const newStats = { ...statsRef.current, losses: (statsRef.current.losses || 0) + 1 };
+        setStats(newStats); statsRef.current = newStats;
+        localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify(newStats));
         setBattle(prev => ({ ...prev, active: false, status: 'SCONFITTO...' }));
         setMode('jutsu-select');
         alert("Sei stato sconfitto! Torna ad allenarti.");
@@ -481,11 +549,16 @@ function App() {
       const bonus = 500;
       const defeatedEnemy = battle.enemy;
       setTimeout(() => {
-        setTotalXp(prev => {
-          const next = prev + bonus;
-          localStorage.setItem(STORAGE_KEY_XP, next.toString());
-          return next;
-        });
+        // Stats
+        const newStats = { ...statsRef.current, wins: (statsRef.current.wins || 0) + 1 };
+        setStats(newStats); statsRef.current = newStats;
+        localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify(newStats));
+        // Achievements
+        if (newStats.wins === 1) unlockAchievement('battle_winner');
+        if (newStats.wins === 5) unlockAchievement('battle_five');
+        if (defeatedEnemy === 'kaguya') unlockAchievement('kaguya_defeated');
+        // XP
+        setTotalXp(prev => { const next = prev + bonus; localStorage.setItem(STORAGE_KEY_XP, next.toString()); return next; });
         syncXpToCloud(totalXpRef.current + bonus);
         setLastXpEarned(bonus);
         setXpPopupTitle(`HAI SCONFITTO ${defeatedEnemy.toUpperCase()}!`);
@@ -495,13 +568,13 @@ function App() {
         setTimeout(() => setShowXpPopup(false), 4000);
       }, 500);
     }
-  }, [battle.userHp, battle.enemyHp, battle.active, battle.enemy, syncXpToCloud]);
+  }, [battle.userHp, battle.enemyHp, battle.active, battle.enemy, syncXpToCloud, unlockAchievement]);
 
   /* ── Jutsu complete ─────────────────────────── */
   const handleJutsuComplete = useCallback(() => {
     const duration = (performance.now() - performanceStartTimeRef.current) / 1000;
     const jutsu = selectedJutsuRef.current;
-    const currentBattle = battleRef.current; // always-fresh: avoids stale closure bug
+    const currentBattle = battleRef.current;
 
     setActiveJutsu(null);
     setSelectedJutsu(null);
@@ -512,17 +585,40 @@ function App() {
 
     if (!jutsu) return;
 
+    // ── Mastery tracking ──
+    const prevCount = jutsuMasteryRef.current[jutsu.id] || 0;
+    const newMastery = { ...jutsuMasteryRef.current, [jutsu.id]: prevCount + 1 };
+    setJutsuMastery(newMastery);
+    jutsuMasteryRef.current = newMastery;
+    localStorage.setItem(STORAGE_KEY_MASTERY, JSON.stringify(newMastery));
+
+    // ── Stats tracking ──
+    const prevStats = statsRef.current;
+    const newJutsuCounts = { ...(prevStats.jutsuCounts || {}), [jutsu.id]: ((prevStats.jutsuCounts || {})[jutsu.id] || 0) + 1 };
+    const newTotal_ = (prevStats.totalJutsus || 0) + 1;
+    const prevFastest = prevStats.fastestJutsu;
+    const newFastest = (!prevFastest || duration < prevFastest.seconds) ? { jutsuId: jutsu.id, seconds: duration } : prevFastest;
+    const newStats = { ...prevStats, totalJutsus: newTotal_, jutsuCounts: newJutsuCounts, fastestJutsu: newFastest };
+    setStats(newStats);
+    statsRef.current = newStats;
+    localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify(newStats));
+
+    // ── XP ──
     const base = 50 + (jutsu.sequence.length * 10);
     const speedBonus = Math.max(1, 1.5 - (duration / 20));
     const earned = Math.round(base * speedBonus);
     const newTotal = totalXpRef.current + earned;
-
-    setTotalXp(prev => {
-      const next = prev + earned;
-      localStorage.setItem(STORAGE_KEY_XP, next.toString());
-      return next;
-    });
+    setTotalXp(prev => { const next = prev + earned; localStorage.setItem(STORAGE_KEY_XP, next.toString()); return next; });
     syncXpToCloud(newTotal);
+
+    // ── Achievements ──
+    if (newTotal_ === 1)   unlockAchievement('first_steps');
+    if (newTotal_ === 10)  unlockAchievement('jutsu_ten');
+    if (newTotal_ === 50)  unlockAchievement('jutsu_fifty');
+    if (newTotal_ === 100) unlockAchievement('jutsu_hundred');
+    if (jutsu.sequence.length >= 3 && duration < 8) unlockAchievement('speed_ninja');
+    if (jutsu.effectType === 'heal' && currentBattle.active) unlockAchievement('heal_battle');
+    if (newMastery[jutsu.id] >= 50) unlockAchievement('master_jutsu');
 
     setLastXpEarned(earned);
     setXpPopupTitle('TECNICA COMPLETATA!');
@@ -532,24 +628,24 @@ function App() {
     if (!currentBattle.active) return;
 
     if (jutsu.effectType === 'heal') {
-      setBattle(prev => ({
-        ...prev,
-        userHp: Math.min(100, prev.userHp + 30),
-        timer: 12,
-        status: 'FERITE RIMARGINATE!'
-      }));
+      setBattle(prev => ({ ...prev, userHp: Math.min(100, prev.userHp + 30), timer: 12, status: 'FERITE RIMARGINATE!' }));
       setTimeout(pickRandomJutsuForBattle, 800);
       return;
     }
 
-    const newEnemyHp = Math.max(0, currentBattle.enemyHp - 25);
-    setBattle(prev => ({ ...prev, enemyHp: newEnemyHp, timer: 12, status: 'OTTIMO COLPO!' }));
+    // ── Boss damage (mastery + weakness bonus) ──
+    const bossData = BOSSES[currentBattle.enemy];
+    const masteryLvl = getMasteryLevel(newMastery[jutsu.id] || 0).level;
+    const baseDmg = 20 + masteryLvl * 5;
+    const weaknessBonus = bossData?.weakness === jutsu.effectType ? 15 : 0;
+    const damage = baseDmg + weaknessBonus;
+    const newEnemyHp = Math.max(0, currentBattle.enemyHp - damage);
+    const hitStatus = weaknessBonus > 0 ? `COLPO CRITICO! -${damage} HP!` : `OTTIMO COLPO! -${damage} HP`;
+    setBattle(prev => ({ ...prev, enemyHp: newEnemyHp, timer: 12, status: hitStatus }));
 
-    if (newEnemyHp > 0) {
-      setTimeout(pickRandomJutsuForBattle, 800);
-    }
-    // newEnemyHp === 0 → the battle.enemyHp useEffect handles victory
-  }, [pickRandomJutsuForBattle, syncXpToCloud, setSelectedJutsu, setMode]);
+    if (newEnemyHp > 0) setTimeout(pickRandomJutsuForBattle, 800);
+    // newEnemyHp === 0 → battle.enemyHp useEffect handles victory
+  }, [pickRandomJutsuForBattle, syncXpToCloud, setSelectedJutsu, setMode, unlockAchievement]);
 
   /* ── Recalibration ──────────────────────────── */
   const toggleSeal = (name) => {
@@ -596,10 +692,59 @@ function App() {
 
 
 
-        {/* Logo */}
+        {/* Logo + connectivity + volume */}
         <div>
-          <div className="title-main">忍術 Simulator</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="title-main">忍術 Simulator</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {/* Connectivity dot */}
+              <div title={isOnline ? 'Online' : 'Offline — XP salvato localmente'} style={{
+                width: '8px', height: '8px', borderRadius: '50%',
+                background: isOnline ? '#22c55e' : '#ef4444',
+                boxShadow: `0 0 6px ${isOnline ? '#22c55e88' : '#ef444488'}`,
+                flexShrink: 0,
+              }} />
+              {/* Volume button */}
+              <button
+                onClick={() => setShowVolumePanel(v => !v)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', padding: '0.1rem', lineHeight: 1 }}
+                title="Volume"
+              >🔊</button>
+            </div>
+          </div>
           <div className="title-kanji">Shinobi Hand Seal Trainer</div>
+
+          {/* Volume panel */}
+          {showVolumePanel && (
+            <div style={{
+              marginTop: '0.6rem', padding: '0.75rem', borderRadius: '0.75rem',
+              background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex', flexDirection: 'column', gap: '0.5rem',
+            }}>
+              {[
+                { label: '🎵 Musica', key: 'music' },
+                { label: '💥 Effetti', key: 'effects' },
+              ].map(({ label, key }) => (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', minWidth: '60px' }}>{label}</span>
+                  <input
+                    type="range" min="0" max="1" step="0.05"
+                    value={volume[key]}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      setVolume(prev => {
+                        const next = { ...prev, [key]: val };
+                        localStorage.setItem(STORAGE_KEY_VOLUME, JSON.stringify(next));
+                        return next;
+                      });
+                    }}
+                    style={{ flex: 1, accentColor: 'var(--naruto-orange)' }}
+                  />
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', minWidth: '28px' }}>{Math.round(volume[key] * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Player Profile */}
@@ -709,7 +854,7 @@ function App() {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1.5rem', textAlign: 'center', animation: 'status-bounce 0.4s ease-out' }}>
             <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
               <div style={{ fontSize: '0.7rem', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '0.5rem' }}>Scontro Ninja</div>
-              <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.8rem', color: '#fff' }}>SFIDA CONTRO {battle.enemy?.toUpperCase()}</div>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.8rem', color: '#fff' }}>SFIDA CONTRO {(BOSSES[battle.enemy]?.name ?? battle.enemy)?.toUpperCase()}</div>
             </div>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
@@ -742,6 +887,7 @@ function App() {
               {Object.values(JUTSUS).map(jutsu => {
                 const allCalibrated = jutsu.sequence.every(s => calibratedSeals[s]);
                 const isLocked = totalXp < (jutsu.minXp || 0);
+                const masteryData = getMasteryLevel(jutsuMastery[jutsu.id] || 0);
                 
                 return (
                   <button
@@ -785,10 +931,19 @@ function App() {
                           <span style={{ fontSize: '0.6rem', color: '#999', background: 'rgba(255,255,255,0.05)', padding: '0.1rem 0.4rem', borderRadius: '0.3rem', border: '1px solid rgba(255,255,255,0.1)' }}>
                             🔒 Sblocca a {jutsu.minXp} XP
                           </span>
-                        ) : !allCalibrated && (
+                        ) : !allCalibrated ? (
                           <span style={{ fontSize: '0.6rem', color: '#F97316', background: 'rgba(249,115,22,0.15)', padding: '0.1rem 0.4rem', borderRadius: '0.3rem', border: '1px solid rgba(249,115,22,0.3)' }}>
                             ⚡ Calibra
                           </span>
+                        ) : masteryData.level > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                            <div style={{ display: 'flex', gap: '2px' }}>
+                              {[1,2,3,4,5].map(i => (
+                                <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i <= masteryData.level ? masteryData.color : 'rgba(255,255,255,0.1)', boxShadow: i <= masteryData.level ? `0 0 3px ${masteryData.color}` : 'none' }} />
+                              ))}
+                            </div>
+                            <span style={{ fontSize: '0.55rem', color: masteryData.color }}>{masteryData.label}</span>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -822,6 +977,10 @@ function App() {
               <button className="ninja-btn" style={{ width: '100%', border: '1px solid var(--chidori-blue)', color: 'var(--chidori-blue)', background: 'rgba(56,189,248,0.05)' }}
                 onClick={() => setMode('leaderboard')}>
                 🏆 Classifica Globale
+              </button>
+              <button className="ninja-btn" style={{ width: '100%', border: '1px solid rgba(168,85,247,0.5)', color: '#a855f7', background: 'rgba(168,85,247,0.05)' }}
+                onClick={() => setMode('profile')}>
+                📊 Profilo &amp; Statistiche
               </button>
             </>
           )}
@@ -1019,11 +1178,11 @@ function App() {
             {/* Enemy HP Bar */}
             <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', width: '60%', zIndex: 100 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#fff', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                <span>{battle.enemy}</span>
-                <span>{battle.enemyHp}%</span>
+                <span>{BOSSES[battle.enemy]?.name ?? battle.enemy}</span>
+                <span>{battle.enemyHp} / {battle.enemyMaxHp ?? battle.enemyHp} HP</span>
               </div>
               <div className="calibration-progress" style={{ height: '10px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)' }}>
-                <div className="calibration-progress-fill" style={{ width: `${battle.enemyHp}%`, background: 'linear-gradient(90deg, #ef4444, #b91c1c)' }} />
+                <div className="calibration-progress-fill" style={{ width: `${(battle.enemyHp / (battle.enemyMaxHp ?? battle.enemyHp)) * 100}%`, background: 'linear-gradient(90deg, #ef4444, #b91c1c)' }} />
               </div>
             </div>
 
@@ -1072,6 +1231,7 @@ function App() {
             jutsu={activeJutsu}
             handLandmarks={window.currentHandLandmarks}
             onComplete={handleJutsuComplete}
+            effectsVolume={volume.effects}
           />
         )}
 
@@ -1080,6 +1240,30 @@ function App() {
           <div className="xp-popup">
             <div className="xp-popup-title">{xpPopupTitle}</div>
             <div className="xp-popup-value">+{lastXpEarned} XP</div>
+          </div>
+        )}
+
+        {/* ── Achievement Toast ── */}
+        {newAchievement && (
+          <div
+            key={newAchievement.id}
+            style={{
+              position: 'absolute', bottom: '140px', right: '20px', zIndex: 200,
+              background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(249,115,22,0.5)',
+              borderRadius: '0.75rem', padding: '0.75rem 1rem',
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              animation: 'jutsuReveal 0.4s ease-out',
+              backdropFilter: 'blur(8px)',
+              maxWidth: '260px',
+            }}
+            onAnimationEnd={() => setTimeout(() => setNewAchievement(null), 3500)}
+          >
+            <span style={{ fontSize: '1.5rem' }}>{newAchievement.icon}</span>
+            <div>
+              <div style={{ fontSize: '0.6rem', color: 'var(--naruto-orange)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Obiettivo Sbloccato!</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>{newAchievement.name}</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{newAchievement.desc}</div>
+            </div>
           </div>
         )}
       </div>
@@ -1121,8 +1305,19 @@ function App() {
       )}
       {/* ── Leaderboard Overlay ── */}
       {mode === 'leaderboard' && (
-        <Leaderboard 
+        <Leaderboard
           currentPlayer={{ uid: user?.uid, name: playerName, xp: totalXp, rank: currentRank.name, photo: user?.photoURL }}
+          onBack={() => setMode('jutsu-select')}
+        />
+      )}
+
+      {/* ── Profile Stats Overlay ── */}
+      {mode === 'profile' && (
+        <ProfileStats
+          stats={stats}
+          mastery={jutsuMastery}
+          achievements={achievements}
+          currentPlayer={{ name: playerName, xp: totalXp, rank: currentRank.name }}
           onBack={() => setMode('jutsu-select')}
         />
       )}

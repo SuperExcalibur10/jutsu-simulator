@@ -135,3 +135,11 @@ export const JUTSUS = {
 export const SEALS_LIST = [...new Set(
   Object.values(JUTSUS).flatMap(j => j.sequence)
 )];
+
+export const BOSSES = {
+  orochimaru: { name: 'Orochimaru', maxHp: 150, minXp: 0,    specialAttack: 'Spada delle Mille Foglie', specialDamage: 25, weakness: 'fire'      },
+  pain:        { name: 'Pain',        maxHp: 175, minXp: 1000, specialAttack: 'Shinra Tensei',            specialDamage: 30, weakness: 'wind'      },
+  obito:       { name: 'Obito',       maxHp: 175, minXp: 3000, specialAttack: 'Kamui',                    specialDamage: 30, weakness: 'lightning' },
+  madara:      { name: 'Madara',      maxHp: 200, minXp: 7000, specialAttack: 'Meteora Celeste',          specialDamage: 35, weakness: 'shadow'    },
+  kaguya:      { name: 'Kaguya',      maxHp: 200, minXp: 9000, specialAttack: 'Cenere Polverizzatrice',   specialDamage: 40, weakness: 'push'      },
+};

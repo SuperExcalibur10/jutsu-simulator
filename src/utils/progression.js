@@ -19,3 +19,19 @@ export const getNextRank = (xp) => {
   }
   return null;
 };
+
+export const MASTERY_LEVELS = [
+  { level: 0, label: '—',        color: '#444',    min: 0  },
+  { level: 1, label: 'Allievo',  color: '#cd7f32', min: 1  },
+  { level: 2, label: 'Ninja',    color: '#94A3B8', min: 5  },
+  { level: 3, label: 'Esperto',  color: '#FFD700', min: 15 },
+  { level: 4, label: 'Maestro',  color: '#67e8f9', min: 30 },
+  { level: 5, label: 'Leggenda', color: '#e879f9', min: 50 },
+];
+
+export const getMasteryLevel = (count) => {
+  for (let i = MASTERY_LEVELS.length - 1; i >= 0; i--) {
+    if (count >= MASTERY_LEVELS[i].min) return MASTERY_LEVELS[i];
+  }
+  return MASTERY_LEVELS[0];
+};

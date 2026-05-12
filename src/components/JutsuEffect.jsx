@@ -10,8 +10,12 @@ const susanooImg = new Image();
 susanooImg.src = '/effects/susanoo.png';
 
 /* ── Audio ──────────────────────────────────────── */
-const playSound = (type, audioCtx) => {
+const playSound = (type, audioCtx, volume = 0.5) => {
   try {
+    const master = audioCtx.createGain();
+    master.gain.value = volume;
+    master.connect(audioCtx.destination);
+    const dst = master;
     if (type === 'lightning') {
       for (let i = 0; i < 8; i++) {
         setTimeout(() => {
@@ -24,7 +28,7 @@ const playSound = (type, audioCtx) => {
           osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.08);
           gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-          osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+          osc.connect(filter); filter.connect(gain); gain.connect(dst);
           osc.start(); osc.stop(audioCtx.currentTime + 0.1);
         }, i * 120);
       }
@@ -39,7 +43,7 @@ const playSound = (type, audioCtx) => {
       gain.gain.setValueAtTime(0, audioCtx.currentTime);
       gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.4);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2.5);
-      src.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+      src.connect(filter); filter.connect(gain); gain.connect(dst);
       src.start();
       const osc = audioCtx.createOscillator(); osc.type = 'sine';
       osc.frequency.setValueAtTime(80, audioCtx.currentTime);
@@ -47,7 +51,7 @@ const playSound = (type, audioCtx) => {
       const g2 = audioCtx.createGain();
       g2.gain.setValueAtTime(0.15, audioCtx.currentTime);
       g2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2);
-      osc.connect(g2); g2.connect(audioCtx.destination);
+      osc.connect(g2); g2.connect(dst);
       osc.start(); osc.stop(audioCtx.currentTime + 2);
     } else if (type === 'fire') {
       const osc = audioCtx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 60;
@@ -56,7 +60,7 @@ const playSound = (type, audioCtx) => {
       gain.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime + 0.3);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 3);
       const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 300;
-      osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+      osc.connect(filter); filter.connect(gain); gain.connect(dst);
       osc.start(); osc.stop(audioCtx.currentTime + 3);
     } else if (type === 'shadow' || type === 'clone') {
       const bufferSize = audioCtx.sampleRate * 0.4;
@@ -68,7 +72,7 @@ const playSound = (type, audioCtx) => {
       nGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
       nGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
       const nFilter = audioCtx.createBiquadFilter(); nFilter.type = 'lowpass'; nFilter.frequency.value = 1200;
-      noise.connect(nFilter); nFilter.connect(nGain); nGain.connect(audioCtx.destination);
+      noise.connect(nFilter); nFilter.connect(nGain); nGain.connect(dst);
       noise.start();
       const osc = audioCtx.createOscillator(); osc.type = 'sine';
       osc.frequency.setValueAtTime(110, audioCtx.currentTime);
@@ -76,7 +80,7 @@ const playSound = (type, audioCtx) => {
       const gain = audioCtx.createGain();
       gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.connect(gain); gain.connect(dst);
       osc.start(); osc.stop(audioCtx.currentTime + 0.4);
     } else if (type === 'heal') {
       const osc = audioCtx.createOscillator();
@@ -86,7 +90,7 @@ const playSound = (type, audioCtx) => {
       osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.5);
       gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2);
-      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.connect(gain); gain.connect(dst);
       osc.start(); osc.stop(audioCtx.currentTime + 2);
       for(let i=0; i<3; i++) {
         setTimeout(() => {
@@ -95,7 +99,7 @@ const playSound = (type, audioCtx) => {
           osc2.frequency.setValueAtTime(1000 + Math.random()*500, audioCtx.currentTime);
           g2.gain.setValueAtTime(0.1, audioCtx.currentTime);
           g2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-          osc2.connect(g2); g2.connect(audioCtx.destination);
+          osc2.connect(g2); g2.connect(dst);
           osc2.start(); osc2.stop(audioCtx.currentTime + 0.3);
         }, 200 + i * 300);
       }
@@ -126,7 +130,7 @@ const loadSummonImage = (name) => {
 };
 
 /* ── Component ────────────────────────────────────── */
-const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
+const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) => {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
   const tRef = useRef(0);
@@ -485,7 +489,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
     
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      playSound(jutsu.effectType, audioCtx);
+      playSound(jutsu.effectType, audioCtx, effectsVolume);
     } catch (e) {
       console.warn("AudioContext error:", e);
     }
@@ -499,7 +503,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete }) => {
       }
       if (rafRef.current) cancelAnimationFrame(rafRef.current); 
     };
-  }, [jutsu, onComplete]);
+  }, [jutsu, onComplete, effectsVolume]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
