@@ -633,59 +633,82 @@ h1, h2, h3, h4 {
 
 /* ── Music Player Widget ────────────────────── */
 .music-player-widget {
-  background: rgba(15, 15, 25, 0.6);
-  backdrop-filter: blur(12px);
-  padding: 0.6rem 1.2rem;
-  border-radius: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: absolute;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 50;
   display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  animation: musicFadeIn 0.8s ease-out forwards;
-  pointer-events: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.8rem 1.2rem;
+  background: rgba(12, 12, 22, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  animation: musicFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: all;
+  min-width: 180px;
 }
 
 @keyframes musicFadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
-.music-icon {
-  width: 20px;
-  height: 20px;
+.music-info {
   display: flex;
-  align-items: flex-end;
-  gap: 2px;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
-.music-bar {
-  width: 3px;
-  background: var(--text-accent);
-  border-radius: 1px;
-  animation: musicBarAnim 1s ease-in-out infinite alternate;
-}
-
-.music-bar:nth-child(1) { height: 40%; animation-delay: 0s; }
-.music-bar:nth-child(2) { height: 100%; animation-delay: 0.2s; }
-.music-bar:nth-child(3) { height: 60%; animation-delay: 0.4s; }
-
-@keyframes musicBarAnim {
-  from { height: 20%; }
-  to { height: 100%; }
-}
-
-.music-text {
-  font-size: 0.75rem;
+.music-label {
+  font-size: 0.6rem;
   color: var(--text-muted);
-  letter-spacing: 0.05em;
-  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 500;
 }
 
 .music-title {
-  color: var(--text-main);
-  font-weight: 600;
-  margin-left: 0.3rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.music-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.5rem;
+  justify-content: center;
+}
+
+.music-ctrl-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.2rem 0.5rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.music-ctrl-btn:hover {
+  color: var(--naruto-orange);
+  transform: scale(1.15);
+}
+
+.music-ctrl-btn:active {
+  transform: scale(0.95);
 }
 
 /* ── XP Popup & Progress ────────────────────── */
