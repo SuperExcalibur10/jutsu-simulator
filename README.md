@@ -13,9 +13,10 @@ A high-performance web application that uses **real-time computer vision** to re
 ## 🌟 Key Features
 
 - **🎯 Real-Time Hand Tracking**: Powered by Google's MediaPipe for high-precision detection of 21 hand landmarks per hand, fully supporting complex two-handed jutsu.
-- **⚔️ Ninja Battle Mode**: Face legendary enemies like Pain, Madara, and Kaguya in a fast-paced reaction-based combat system that scales with your ninja rank.
-- **☁️ Cloud Sync & Global Leaderboard**: Sign in securely with Google via **Firebase Authentication**. Your XP and Rank are synchronized across devices via **Cloud Firestore**, allowing you to compete against other shinobi worldwide.
-- **📈 Progression & Ranks**: Earn XP for successful jutsu and rise through the ranks from Academy Student to Kage.
+- **⚔️ Strategic Ninja Battles**: Face a roster of 12 legendary villains. Choose your opponent via a dedicated selection menu or opt for random encounters. Difficulty and rewards scale based on the opponent's strength.
+- **🎵 Dynamic Soundtrack**: Integrated music player with pause/skip controls and a library of 9 iconic Naruto tracks.
+- **☁️ Cloud Sync & Global Leaderboard**: Sign in securely with Google via **Firebase Authentication**. Your XP and Rank are synchronized across devices via **Cloud Firestore**.
+- **📈 Progression & Ranks**: Earn calibrated XP rewards and rise through ranks from Academy Student to Kage, with your Max HP increasing as you grow stronger.
 - **✨ Premium Visuals & Audio**: Dynamic HTML5 Canvas effects, cinematic character cut-ins, procedural audio synthesis (Web Audio API), and real-time AI background segmentation (Susanoo).
 - **🎥 Session Recording**: Capture and download your jutsu performances with the integrated browser screen recorder.
 - **🔒 Privacy First**: All AI vision processing is done locally in your browser. No video data ever leaves your device. Only your nickname and XP are saved to the cloud.

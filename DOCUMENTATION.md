@@ -52,14 +52,28 @@ Lato front-end, gli input stringa (es. il Nickname personalizzato) vengono sanif
 ## 4. Game Logic & Progression
 
 ### Battle Mode
-Il sistema di combattimento (`battle` state) implementa un loop basato sui riflessi:
-- **Scaling Dinamico**: Il nemico schierato dipende dall'XP totale del giocatore (`minXp` threshold).
-- **Timer & Danni**: L'utente ha 12 secondi per completare la sequenza di sigilli estratta casualmente. Il fallimento provoca un decurtamento degli HP. La cura ripristina gli HP, l'attacco intacca gli HP nemici.
-- **Pacing Fluid**: Sconfitto un nemico, il ciclo viene bloccato (clearing the Timeout state) per mostrare l'XP popup, per poi ripartire in automatico verso il prossimo target.
+Il sistema di combattimento (`battle` state) implementa un loop basato sui riflessi e sulla progressione:
+- **Selezione Avversario**: L'utente può scegliere tra 12 nemici leggendari (da Zabuza a Kaguya) tramite un menu dedicato. L'accesso ai nemici più forti è vincolato alla soglia di XP posseduti (`minXp`).
+- **Scaling dei Premi**: Ogni vittoria garantisce un `xpReward` proporzionale alla forza del nemico (es. Zabuza: 100 XP, Kaguya: 1000 XP).
+- **HP del Giocatore**: La salute massima scala con il grado Ninja (Academy: 100 HP → Kage: 300 HP).
+- **Timer & Danni**: L'utente ha 12 secondi per completare la sequenza. Se il tempo scade, il nemico colpisce con una tecnica speciale lore-accurate e la tecnica richiesta ruota casualmente per mantenere dinamico lo scontro.
 
 ---
 
-## 5. Motore Grafico e Sonoro (VFX)
+## 5. Sistemi Ausiliari
+
+### Music Player
+Un widget dedicato in `WebcamView` gestisce una playlist di 9 brani iconici. Supporta:
+- Riproduzione casuale automatica.
+- Controlli utente per Pausa/Play e Skip.
+- Sincronizzazione volume globale.
+
+### Leaderboard & Privacy Admin
+Per garantire la privacy degli amministratori, il sistema identifica l'email definita in `VITE_ADMIN_EMAIL`. Gli account admin vengono salvati con un flag `isHidden: true` e vengono automaticamente filtrati dalla classifica globale.
+
+---
+
+## 6. Motore Grafico e Sonoro (VFX)
 
 - **Manipolazione Diretta del DOM**: Durante la performance ad alta frequenza, i progressi a schermo vengono aggiornati aggirando la riconciliazione di React (`document.getElementById().innerText` e `.style.width`), riducendo a 0 i re-render del componente padre.
 - **Sistemi Particellari Canvas**: Usati per Katon, Chidori e Palmo Mistico.

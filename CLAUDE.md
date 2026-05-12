@@ -30,9 +30,10 @@ Firebase credentials are required even in dev — the app calls Firestore and Au
 jutsu-select → calibration → perform → effect (JutsuEffect overlay)
              ↑                                ↓
              └────────── (battle active) ─────┘
-jutsu-select → battle → perform → effect → (next battle jutsu)
+jutsu-select → boss-select → battle → perform → effect → (next battle jutsu)
 jutsu-select → recalibrate-menu → calibration → jutsu-select
 jutsu-select → leaderboard
+jutsu-select → profile
 ```
 
 ### Hand tracking pipeline
@@ -73,8 +74,9 @@ Inside `handleWebcamResults` (called every animation frame), the chakra-fill bar
 ### Firebase / data layer
 
 - **Auth**: Google Sign-In via popup. `onAuthStateChanged` in the startup `useEffect` syncs cloud XP to localStorage on login and resolves the `isAuthLoading` gate.
-- **Firestore collection `players`**: documents keyed by `uid`, fields `name`, `xp`, `rank`, `photo`, `lastSeen`. XP is written on every jutsu completion (`syncXpToCloud`).
-- **Leaderboard**: real-time `onSnapshot` query — top 20 players ordered by `xp` desc.
+- **Firestore collection `players`**: documents keyed by `uid`, fields `name`, `xp`, `rank`, `photo`, `lastSeen`, `isHidden`.
+- **Leaderboard**: real-time `onSnapshot` query — top 20 players ordered by `xp` desc, excluding documents where `isHidden == true`.
+- **Admin**: if current user email matches `VITE_ADMIN_EMAIL`, `isHidden` is set to `true` to hide from leaderboard.
 - **Offline fallback**: XP and calibrated seals are always persisted in `localStorage` (`jutsu_sim_v4_xp`, `jutsu_sim_v4_seals`).
 
 ### Static assets (under `public/`)
