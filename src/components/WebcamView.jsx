@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useHandTracking } from '../hooks/useHandTracking';
 
-const WebcamView = ({ onResults, currentSong }) => {
+const WebcamView = ({ onResults, currentSong, isMusicPlaying, toggleMusic, skipMusic }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const requestRef = useRef(null);
@@ -240,6 +240,14 @@ const WebcamView = ({ onResults, currentSong }) => {
               </div>
               <div className="music-text">
                 NOW PLAYING <span className="music-title">{currentSong.title}</span>
+              </div>
+              <div className="music-controls-mini">
+                <button className="music-mini-btn" onClick={toggleMusic} title={isMusicPlaying ? "Pausa" : "Play"}>
+                  {isMusicPlaying ? "⏸" : "▶"}
+                </button>
+                <button className="music-mini-btn" onClick={skipMusic} title="Skip">
+                  ⏭
+                </button>
               </div>
             </div>
           )}

@@ -1294,7 +1294,13 @@ function App() {
         {/* Naruto Logo (Now inside webcam) */}
         <img src={`/assets/naruto_logo.png?v=${ASSET_V}`} className="deco-logo" alt="Naruto Logo" />
 
-        <WebcamView onResults={handleWebcamResults} currentSong={currentSong} />
+        <WebcamView 
+          onResults={handleWebcamResults} 
+          currentSong={currentSong} 
+          isMusicPlaying={isMusicPlaying}
+          toggleMusic={toggleMusic}
+          skipMusic={skipMusic}
+        />
 
         {/* Decorative Sasuke & Naruto (Clipped inside webcam frame) */}
         <img src={`/assets/sasuke.png?v=${ASSET_V}`} className="deco-sasuke" alt="" />
@@ -1419,23 +1425,6 @@ function App() {
             <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: '1.5rem' }}>
               I tuoi dati verranno crittografati e gestiti in modo sicuro tramite Firebase.
             </p>
-          </div>
-        </div>
-      )}
-      {/* ── Music Player Widget ── */}
-      {currentSong && (
-        <div className="music-player-widget">
-          <div className="music-info">
-            <div className="music-label">Riproduzione</div>
-            <div className="music-title">{currentSong.title}</div>
-          </div>
-          <div className="music-controls">
-            <button className="music-ctrl-btn" onClick={toggleMusic} title={isMusicPlaying ? "Pausa" : "Riproduci"}>
-              {isMusicPlaying ? "⏸" : "▶"}
-            </button>
-            <button className="music-ctrl-btn" onClick={skipMusic} title="Prossima Canzone">
-              ⏭
-            </button>
           </div>
         </div>
       )}
