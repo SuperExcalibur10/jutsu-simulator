@@ -602,9 +602,9 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
     const rotation = t * 0.022;
 
     for (let side = -1; side <= 1; side += 2) {
-      // Spostamento leggermente a sinistra (-w * 0.015) e leggermente in basso (+h * 0.03)
+      // Spostamento leggermente a sinistra (-w * 0.015) e in basso (+h * 0.05)
       const ex = fcx + side * eyeSpacing - (w * 0.015);
-      const ey = fcy + (h * 0.03);
+      const ey = fcy + (h * 0.05);
       ctx.globalAlpha = fadeIn;
 
       // Outer pulsing halo

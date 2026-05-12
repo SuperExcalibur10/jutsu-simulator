@@ -963,27 +963,73 @@ function App() {
                   </button>
                 );
               })}
-              <button className="ninja-btn primary" style={{ width: '100%', padding: '0.8rem', fontSize: '1.1rem' }}
+              <button className="ninja-btn primary" style={{ 
+                width: '100%', padding: '1rem', fontSize: '1.15rem', 
+                boxShadow: '0 0 25px var(--naruto-orange-glow)',
+                marginTop: '0.5rem',
+                border: '1px solid rgba(255,255,255,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem'
+              }}
                 onClick={startBattle} disabled={battle.active}>
-                ⚔️ SCONTRO NINJA
+                <span style={{ fontSize: '1.4rem' }}>⚔️</span> SCONTRO NINJA
               </button>
             </div>
 
-              <button className="ninja-btn danger" style={{ width: '100%', marginTop: 'auto' }}
-                onClick={() => { setSelectedForRecal(new Set()); setMode('recalibrate-menu'); }}>
-                ⚙ Ricalibra Sigilli
-              </button>
+            {/* Utility & Social Section (Sticky Footer) */}
+            <div className="glass-panel" style={{ 
+              marginTop: 'auto', 
+              padding: '1.2rem', 
+              background: 'rgba(12, 12, 22, 0.95)', 
+              backdropFilter: 'blur(12px)',
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '0.75rem',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 -10px 25px rgba(0,0,0,0.5)',
+              position: 'sticky',
+              bottom: '-1.5rem', /* Adjusted for sidebar padding */
+              marginRight: '-0.5rem',
+              marginLeft: '-0.5rem',
+              zIndex: 5
+            }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '0.2rem', textAlign: 'center' }}>
+                Accademia & Community
+              </div>
               
-              <button className="ninja-btn" style={{ width: '100%', border: '1px solid var(--chidori-blue)', color: 'var(--chidori-blue)', background: 'rgba(56,189,248,0.05)' }}
-                onClick={() => setMode('leaderboard')}>
-                🏆 Classifica Globale
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <button className="ninja-btn" style={{ 
+                  padding: '0.75rem 0.5rem', fontSize: '0.8rem', width: '100%', 
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', 
+                  background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', 
+                  color: 'var(--chidori-blue)', borderRadius: '0.8rem' 
+                }}
+                  onClick={() => setMode('leaderboard')}>
+                  <span style={{ fontSize: '1.4rem' }}>🏆</span>
+                  Classifica
+                </button>
+                <button className="ninja-btn" style={{ 
+                  padding: '0.75rem 0.5rem', fontSize: '0.8rem', width: '100%', 
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', 
+                  background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)', 
+                  color: '#a855f7', borderRadius: '0.8rem' 
+                }}
+                  onClick={() => setMode('profile')}>
+                  <span style={{ fontSize: '1.4rem' }}>📊</span>
+                  Profilo
+                </button>
+              </div>
+
+              <button className="ninja-btn danger" style={{ 
+                width: '100%', padding: '0.7rem', fontSize: '0.85rem', 
+                marginTop: '0.2rem', border: '1px solid rgba(239,68,68,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+              }}
+                onClick={() => { setSelectedForRecal(new Set()); setMode('recalibrate-menu'); }}>
+                <span style={{ fontSize: '1.1rem' }}>⚙️</span> Ricalibra Sigilli
               </button>
-              <button className="ninja-btn" style={{ width: '100%', border: '1px solid rgba(168,85,247,0.5)', color: '#a855f7', background: 'rgba(168,85,247,0.05)' }}
-                onClick={() => setMode('profile')}>
-                📊 Profilo &amp; Statistiche
-              </button>
-            </>
-          )}
+            </div>
+          </>
+        )}
 
         {/* ─── CALIBRATION ─── */}
         {mode === 'calibration' && calibrationQueue.length > 0 && (
