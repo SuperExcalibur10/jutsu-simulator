@@ -103,6 +103,19 @@ export const JUTSUS = {
     imageId: 'kisame_drago_acquatico',
     minXp: 4500
   },
+  TSUKUYOMI: {
+    id: 'TSUKUYOMI',
+    name: 'Tsukuyomi',
+    subtitle: "Genjutsu dello Specchio Lunare",
+    character: 'Itachi · Clan Uchiha',
+    sequence: ['Tigre', 'Bue', 'Serpente'],
+    effectType: 'sharingan',
+    color: '#DC2626',
+    glowColor: 'rgba(220,38,38,0.8)',
+    kanji: '月読',
+    imageId: 'itachi_susanoo',
+    minXp: 6000
+  },
   SUSANOO: {
     id: 'SUSANOO',
     name: 'Susanoo',
@@ -128,19 +141,6 @@ export const JUTSUS = {
     kanji: '神羅天征',
     imageId: 'pain_shinratensei',
     minXp: 12000
-  },
-  TSUKUYOMI: {
-    id: 'TSUKUYOMI',
-    name: 'Tsukuyomi',
-    subtitle: "Genjutsu dello Specchio Lunare",
-    character: 'Itachi · Clan Uchiha',
-    sequence: ['Tigre', 'Bue', 'Serpente'],
-    effectType: 'sharingan',
-    color: '#DC2626',
-    glowColor: 'rgba(220,38,38,0.8)',
-    kanji: '月読',
-    imageId: 'itachi_susanoo',
-    minXp: 6000
   }
 };
 
