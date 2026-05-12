@@ -185,9 +185,56 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
   const userCanvasRef = useRef(null);
   const userCtxRef = useRef(null);
   const isSegmentingRef = useRef(false);
+  const faceEstimRef = useRef(null);
+  const faceEstimAgeRef = useRef(999);
+  const thumbCanvasRef = useRef(null);
+  const thumbCtxRef = useRef(null);
 
   const [showCutIn, setShowCutIn] = useState(true);
   const [summonedAnimal, setSummonedAnimal] = useState(null);
+
+  // Lightweight face estimation from the segmentation mask thumbnail (80×60).
+  // Returns { cx, cy, eyeSpacing } in canvas-pixel coordinates, or null.
+  const estimateFacePos = useCallback((canvasW, canvasH) => {
+    if (!maskCanvasRef.current || !isSegmentingRef.current) return null;
+    const SW = 80, SH = 60;
+    if (!thumbCanvasRef.current) {
+      thumbCanvasRef.current = document.createElement('canvas');
+      thumbCanvasRef.current.width = SW;
+      thumbCanvasRef.current.height = SH;
+      thumbCtxRef.current = thumbCanvasRef.current.getContext('2d', { willReadFrequently: true });
+    }
+    thumbCtxRef.current.clearRect(0, 0, SW, SH);
+    thumbCtxRef.current.drawImage(maskCanvasRef.current, 0, 0, SW, SH);
+    const d = thumbCtxRef.current.getImageData(0, 0, SW, SH).data;
+
+    let yTop = SH;
+    outer: for (let y = 0; y < SH; y++) {
+      for (let x = 0; x < SW; x++) {
+        if (d[(y * SW + x) * 4 + 3] > 48) { yTop = y; break outer; }
+      }
+    }
+    if (yTop >= SH) return null;
+
+    // Measure head width in the first ~22 rows below the head top
+    let xMin = SW, xMax = 0;
+    const scanBot = Math.min(yTop + 22, SH);
+    for (let y = yTop; y < scanBot; y++) {
+      for (let x = 0; x < SW; x++) {
+        if (d[(y * SW + x) * 4 + 3] > 48) {
+          if (x < xMin) xMin = x;
+          if (x > xMax) xMax = x;
+        }
+      }
+    }
+    if (xMax <= xMin) return null;
+
+    const scaleX = canvasW / SW, scaleY = canvasH / SH;
+    const headCX = ((xMin + xMax) / 2) * scaleX;
+    const headW = (xMax - xMin) * scaleX;
+    // Eyes at ~55% of head-width below the head top; half inter-eye ≈ 22% of head-width
+    return { cx: headCX, cy: yTop * scaleY + headW * 0.55, eyeSpacing: headW * 0.22 };
+  }, []);
 
   const updateSegmentation = useCallback((video, segmenter, vW, vH) => {
     if (!maskCanvasRef.current || maskCanvasRef.current.width !== vW) {
@@ -508,8 +555,27 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
     vig.addColorStop(1, 'rgba(60,0,0,0.92)');
     ctx.fillStyle = vig; ctx.fillRect(0, 0, w, h);
 
+    // Re-estimate face position every 45 frames (~0.75 s) using segmentation thumbnail
+    faceEstimAgeRef.current++;
+    if (faceEstimAgeRef.current > 45) {
+      const newEstim = estimateFacePos(w, h);
+      if (newEstim) {
+        if (!faceEstimRef.current) {
+          faceEstimRef.current = newEstim;
+        } else {
+          // Lerp for smooth tracking
+          const f = faceEstimRef.current;
+          f.cx          += (newEstim.cx          - f.cx)          * 0.4;
+          f.cy          += (newEstim.cy          - f.cy)          * 0.4;
+          f.eyeSpacing  += (newEstim.eyeSpacing  - f.eyeSpacing)  * 0.4;
+        }
+      }
+      faceEstimAgeRef.current = 0;
+    }
+    const face = faceEstimRef.current;
+    const fcx = face ? face.cx : w / 2;
+    const fcy = face ? face.cy : h * 0.27;
     // Subtle chakra tendrils from face center
-    const fcx = w/2, fcy = h * 0.27;
     ctx.save();
     ctx.globalAlpha = 0.12 + 0.06 * Math.sin(t * 0.06);
     ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 1.5;
@@ -525,7 +591,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
 
     // === Sharingan Eyes ===
     const fadeIn = Math.min(1, Math.max(0, (t - 8) / 18));
-    const eyeSpacing = w * 0.125;
+    const eyeSpacing = face ? face.eyeSpacing : w * 0.125;
     const eyeR = Math.min(w, h) * 0.068;
     const rotation = t * 0.022;
 
@@ -636,7 +702,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
       ctx.globalAlpha = 1;
       ctx.shadowBlur = 0;
     }
-  }, [updateSegmentation]);
+  }, [updateSegmentation, estimateFacePos]);
 
   const renderPush = useCallback((_ctx, w, h, tx, ty, frame) => {
     _ctx.clearRect(0, 0, w, h);
