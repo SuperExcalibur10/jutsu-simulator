@@ -509,7 +509,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
     ctx.fillStyle = vig; ctx.fillRect(0, 0, w, h);
 
     // Subtle chakra tendrils from face center
-    const fcx = w/2, fcy = h * 0.33;
+    const fcx = w/2, fcy = h * 0.27;
     ctx.save();
     ctx.globalAlpha = 0.12 + 0.06 * Math.sin(t * 0.06);
     ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 1.5;
@@ -525,8 +525,8 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
 
     // === Sharingan Eyes ===
     const fadeIn = Math.min(1, Math.max(0, (t - 8) / 18));
-    const eyeSpacing = w * 0.096;
-    const eyeR = Math.min(w, h) * 0.048;
+    const eyeSpacing = w * 0.125;
+    const eyeR = Math.min(w, h) * 0.068;
     const rotation = t * 0.022;
 
     for (let side = -1; side <= 1; side += 2) {
@@ -597,36 +597,39 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
         ctx.save();
         ctx.translate(cx_, cy_);
         ctx.rotate(flightDir);
-        ctx.fillStyle = '#0a0000';
-        ctx.shadowBlur = 10; ctx.shadowColor = '#dc2626';
-        // Body
-        ctx.beginPath(); ctx.ellipse(0, 0, sz * 1.1, sz * 0.38, 0, 0, Math.PI*2); ctx.fill();
-        // Head
-        ctx.beginPath(); ctx.arc(sz * 0.85, -sz * 0.12, sz * 0.32, 0, Math.PI*2); ctx.fill();
-        // Beak
+        ctx.fillStyle = '#060000';
+        ctx.shadowBlur = 14; ctx.shadowColor = '#dc2626';
+        // Body — elongated oval
+        ctx.beginPath(); ctx.ellipse(0, 0, sz * 1.3, sz * 0.42, 0, 0, Math.PI*2); ctx.fill();
+        // Head — small circle forward
+        ctx.beginPath(); ctx.arc(sz * 1.0, -sz * 0.1, sz * 0.38, 0, Math.PI*2); ctx.fill();
+        // Beak — sharp forward triangle
         ctx.beginPath();
-        ctx.moveTo(sz * 1.15, -sz * 0.18); ctx.lineTo(sz * 1.55, -sz * 0.04); ctx.lineTo(sz * 1.15, sz * 0.04);
+        ctx.moveTo(sz * 1.35, -sz * 0.16); ctx.lineTo(sz * 1.85, 0); ctx.lineTo(sz * 1.35, sz * 0.12);
         ctx.closePath(); ctx.fill();
-        // Left wing (flapping up)
-        ctx.save(); ctx.rotate(-wing);
+        // Left wing up
+        ctx.save(); ctx.rotate(-wing * 0.9);
         ctx.beginPath();
-        ctx.moveTo(-sz * 0.1, 0);
-        ctx.bezierCurveTo(-sz * 0.4, -sz * 1.1, -sz * 1.4, -sz * 0.75, -sz * 1.9, -sz * 0.25);
-        ctx.bezierCurveTo(-sz * 1.1, -sz * 0.05, -sz * 0.4, sz * 0.08, -sz * 0.1, 0);
-        ctx.closePath(); ctx.fill();
-        ctx.restore();
-        // Right wing (flapping down)
-        ctx.save(); ctx.rotate(wing);
-        ctx.beginPath();
-        ctx.moveTo(-sz * 0.1, 0);
-        ctx.bezierCurveTo(-sz * 0.4, sz * 1.1, -sz * 1.4, sz * 0.75, -sz * 1.9, sz * 0.25);
-        ctx.bezierCurveTo(-sz * 1.1, sz * 0.05, -sz * 0.4, -sz * 0.08, -sz * 0.1, 0);
+        ctx.moveTo(-sz * 0.15, -sz * 0.1);
+        ctx.bezierCurveTo(-sz * 0.5, -sz * 1.5, -sz * 1.8, -sz * 1.1, -sz * 2.6, -sz * 0.35);
+        ctx.bezierCurveTo(-sz * 1.7, -sz * 0.05, -sz * 0.6, sz * 0.12, -sz * 0.15, -sz * 0.1);
         ctx.closePath(); ctx.fill();
         ctx.restore();
-        // Tail
+        // Right wing down
+        ctx.save(); ctx.rotate(wing * 0.9);
         ctx.beginPath();
-        ctx.moveTo(-sz * 0.7, 0); ctx.lineTo(-sz * 1.4, -sz * 0.28);
-        ctx.lineTo(-sz * 1.55, sz * 0.0); ctx.lineTo(-sz * 1.4, sz * 0.28);
+        ctx.moveTo(-sz * 0.15, sz * 0.1);
+        ctx.bezierCurveTo(-sz * 0.5, sz * 1.5, -sz * 1.8, sz * 1.1, -sz * 2.6, sz * 0.35);
+        ctx.bezierCurveTo(-sz * 1.7, sz * 0.05, -sz * 0.6, -sz * 0.12, -sz * 0.15, sz * 0.1);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+        // Tail — forked fan
+        ctx.beginPath();
+        ctx.moveTo(-sz * 0.8, -sz * 0.1);
+        ctx.lineTo(-sz * 1.9, -sz * 0.5);
+        ctx.lineTo(-sz * 2.0, sz * 0.0);
+        ctx.lineTo(-sz * 1.9, sz * 0.5);
+        ctx.lineTo(-sz * 0.8, sz * 0.1);
         ctx.closePath(); ctx.fill();
         ctx.restore();
       });
@@ -688,7 +691,7 @@ const JutsuEffect = ({ jutsu, handLandmarks, onComplete, effectsVolume = 0.5 }) 
       orbitY: 45 + (i % 3) * 40,
       speed: (0.011 + (i % 4) * 0.004) * (i % 2 === 0 ? 1 : -1),
       wingPhase: Math.random() * Math.PI * 2,
-      size: 7 + Math.random() * 7,
+      size: 24 + Math.random() * 18,
     }));
   }, []);
 

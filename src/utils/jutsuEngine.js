@@ -105,14 +105,14 @@ export const JUTSUS = {
   },
   TSUKUYOMI: {
     id: 'TSUKUYOMI',
-    name: 'Tsukuyomi',
-    subtitle: "Genjutsu dello Specchio Lunare",
+    name: 'Mangekyō Sharingan',
+    subtitle: "Il Dōjutsu Supremo degli Uchiha",
     character: 'Itachi · Clan Uchiha',
     sequence: ['Tigre', 'Bue', 'Serpente'],
     effectType: 'sharingan',
     color: '#DC2626',
     glowColor: 'rgba(220,38,38,0.8)',
-    kanji: '月読',
+    kanji: '万華鏡写輪眼',
     imageId: 'itachi_susanoo',
     minXp: 6000
   },
