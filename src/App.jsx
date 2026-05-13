@@ -835,7 +835,7 @@ function App() {
       if (newUserHp > 0) setTimeout(pickRandomJutsuForBattle, 800);
     }
     // newEnemyHp === 0 → battle.enemyHp useEffect handles victory
-  }, [pickRandomJutsuForBattle, syncXpToCloud, setSelectedJutsu, setMode, unlockAchievement]);
+  }, [pickRandomJutsuForBattle, syncProfileToCloud, setSelectedJutsu, setMode, unlockAchievement]);
 
   /* ── Recalibration ──────────────────────────── */
   const toggleSeal = (name) => {
