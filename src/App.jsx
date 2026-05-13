@@ -1004,7 +1004,7 @@ function App() {
                   localStorage.setItem(STORAGE_KEY_XP, next.toString());
                   return next;
                 });
-                syncXpToCloud(newTotal);
+                syncProfileToCloud(newTotal);
                 rankClicksRef.current = [];
                 alert("ADMIN CHAKRA! Hai ottenuto 10.000 XP.");
               }
