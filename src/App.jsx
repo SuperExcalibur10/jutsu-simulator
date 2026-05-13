@@ -220,7 +220,7 @@ function App() {
   useEffect(() => {
     const audio = audioRef.current;
     audio.onended = playRandom;
-    playRandom();
+    setTimeout(playRandom, 0);
 
     return () => {
       audio.pause();
@@ -238,6 +238,27 @@ function App() {
     window.addEventListener('offline', down);
     return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
   }, []);
+
+  /* ── Cloud Sync ─────────────────────────────────── */
+  const syncProfileToCloud = useCallback(async (newTotal = totalXpRef.current) => {
+    if (user) {
+      try {
+        const userRef = doc(db, 'players', user.uid);
+        await setDoc(userRef, {
+          xp: newTotal,
+          rank: getCurrentRank(newTotal).name,
+          mastery: jutsuMasteryRef.current,
+          achievements: achievementsRef.current,
+          stats: statsRef.current,
+          tutorialSeen: localStorage.getItem('jutsu_tutorial_seen') === 'true',
+          isHidden: user.email === import.meta.env.VITE_ADMIN_EMAIL,
+          lastSeen: new Date()
+        }, { merge: true });
+      } catch (e) {
+        console.error("Cloud sync failed:", e);
+      }
+    }
+  }, [user]);
 
   /* ── Achievement helper ─────────────────────── */
   const unlockAchievement = useCallback((id) => {
@@ -348,26 +369,6 @@ function App() {
     setTotalXp(0);
     localStorage.removeItem(STORAGE_KEY_XP);
   }, []);
-
-  const syncProfileToCloud = useCallback(async (newTotal = totalXpRef.current) => {
-    if (user) {
-      try {
-        const userRef = doc(db, 'players', user.uid);
-        await setDoc(userRef, {
-          xp: newTotal,
-          rank: getCurrentRank(newTotal).name,
-          mastery: jutsuMasteryRef.current,
-          achievements: achievementsRef.current,
-          stats: statsRef.current,
-          tutorialSeen: localStorage.getItem('jutsu_tutorial_seen') === 'true',
-          isHidden: user.email === import.meta.env.VITE_ADMIN_EMAIL,
-          lastSeen: new Date()
-        }, { merge: true });
-      } catch (e) {
-        console.error("Cloud sync failed:", e);
-      }
-    }
-  }, [user]);
 
   const closeTutorial = useCallback(() => {
     setShowTutorial(false);
