@@ -862,7 +862,7 @@ function App() {
         </div>
 
         {/* Player Profile */}
-        {isAuthLoading ? (
+        {!battle.active && (isAuthLoading ? (
           <div className="glass-panel" style={{ padding: '0.8rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', animation: 'pulse-glow 1.5s infinite' }} />
              <div style={{ flex: 1 }}>
@@ -900,68 +900,70 @@ function App() {
               🚪
             </button>
           </div>
-        )}
+        ))}
 
         {/* ── Progression Widget ── */}
-        <div 
-          className="glass-panel" 
-          style={{ padding: '1rem', background: 'rgba(0,0,0,0.4)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
-          onClick={() => {
-            const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
-            if (!user || user.email !== ADMIN_EMAIL) return;
+        {!battle.active && (
+          <div 
+            className="glass-panel" 
+            style={{ padding: '1rem', background: 'rgba(0,0,0,0.4)', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+            onClick={() => {
+              const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
+              if (!user || user.email !== ADMIN_EMAIL) return;
 
-            const now = Date.now();
-            rankClicksRef.current = rankClicksRef.current.filter(t => now - t < 1000);
-            rankClicksRef.current.push(now);
-            if (rankClicksRef.current.length >= 3) {
-              const bonus = 10000;
-              const newTotal = totalXpRef.current + bonus;
-              setTotalXp(prev => {
-                const next = prev + bonus;
-                localStorage.setItem(STORAGE_KEY_XP, next.toString());
-                return next;
-              });
-              syncXpToCloud(newTotal);
-              rankClicksRef.current = [];
-              alert("ADMIN CHAKRA! Hai ottenuto 10.000 XP.");
-            }
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.6rem' }}>
-            <div>
-              <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.1em' }}>Grado Ninja</div>
-              <div style={{
-                fontFamily: 'var(--font-title)', fontSize: '1.5rem',
-                color: currentRank.color,
-                textShadow: `0 0 10px ${currentRank.color}44`
-              }}>
-                {currentRank.name}
+              const now = Date.now();
+              rankClicksRef.current = rankClicksRef.current.filter(t => now - t < 1000);
+              rankClicksRef.current.push(now);
+              if (rankClicksRef.current.length >= 3) {
+                const bonus = 10000;
+                const newTotal = totalXpRef.current + bonus;
+                setTotalXp(prev => {
+                  const next = prev + bonus;
+                  localStorage.setItem(STORAGE_KEY_XP, next.toString());
+                  return next;
+                });
+                syncXpToCloud(newTotal);
+                rankClicksRef.current = [];
+                alert("ADMIN CHAKRA! Hai ottenuto 10.000 XP.");
+              }
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.6rem' }}>
+              <div>
+                <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.1em' }}>Grado Ninja</div>
+                <div style={{
+                  fontFamily: 'var(--font-title)', fontSize: '1.5rem',
+                  color: currentRank.color,
+                  textShadow: `0 0 10px ${currentRank.color}44`
+                }}>
+                  {currentRank.name}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Punti Esperienza</div>
+                <div style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1rem' }}>{totalXp} XP</div>
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Punti Esperienza</div>
-              <div style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1rem' }}>{totalXp} XP</div>
-            </div>
+
+            {nextRank && (
+              <>
+                <div className="calibration-progress" style={{ height: '6px', background: 'rgba(255,255,255,0.05)' }}>
+                  <div
+                    className="calibration-progress-fill"
+                    style={{
+                      width: `${((totalXp - currentRank.min) / (nextRank.min - currentRank.min)) * 100}%`,
+                      background: currentRank.color
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+                  <span>{currentRank.min}</span>
+                  <span>Prossimo Grado: {nextRank.name} ({nextRank.min})</span>
+                </div>
+              </>
+            )}
           </div>
-
-          {nextRank && (
-            <>
-              <div className="calibration-progress" style={{ height: '6px', background: 'rgba(255,255,255,0.05)' }}>
-                <div
-                  className="calibration-progress-fill"
-                  style={{
-                    width: `${((totalXp - currentRank.min) / (nextRank.min - currentRank.min)) * 100}%`,
-                    background: currentRank.color
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-                <span>{currentRank.min}</span>
-                <span>Prossimo Grado: {nextRank.name} ({nextRank.min})</span>
-              </div>
-            </>
-          )}
-        </div>
+        )}
 
         {/* ─── BATTLE MODE ─── */}
         {mode === 'battle' && (
@@ -1271,49 +1273,69 @@ function App() {
                   if (battle.active && !isCurrent) return null;
                   return (
                     <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: '0.75rem',
-                      padding: '0.6rem 0.85rem', borderRadius: '0.65rem',
+                      display: 'flex', 
+                      flexDirection: battle.active ? 'column' : 'row',
+                      alignItems: 'center', 
+                      gap: '0.75rem',
+                      padding: battle.active ? '1.5rem' : '0.6rem 0.85rem', 
+                      borderRadius: '1rem',
                       background: isDone ? 'rgba(34,197,94,0.1)' : isCurrent ? `${selectedJutsu.glowColor.replace('0.6','0.15')}` : 'rgba(255,255,255,0.03)',
                       border: `1px solid ${isDone ? 'rgba(34,197,94,0.35)' : isCurrent ? selectedJutsu.glowColor.replace('0.6','0.5') : 'rgba(255,255,255,0.07)'}`,
-                      boxShadow: isCurrent && stepFlash ? `0 0 20px ${selectedJutsu.glowColor}` : isCurrent ? `0 0 10px ${selectedJutsu.glowColor.replace('0.6','0.3')}` : 'none',
+                      boxShadow: isCurrent && stepFlash ? `0 0 30px ${selectedJutsu.glowColor}` : isCurrent ? `0 0 15px ${selectedJutsu.glowColor.replace('0.6','0.3')}` : 'none',
                       transition: 'all 0.3s',
+                      textAlign: battle.active ? 'center' : 'left'
                     }} className={isCurrent && stepFlash ? 'seal-step-success' : ''}>
                       <div style={{
-                        width: '28px', height: '28px', borderRadius: '50%',
+                        width: battle.active ? '40px' : '28px', 
+                        height: battle.active ? '40px' : '28px', 
+                        borderRadius: '50%',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: isDone ? '#22c55e' : isCurrent ? selectedJutsu.color : 'rgba(255,255,255,0.08)',
-                        fontSize: '0.75rem', fontWeight: 700, color: isDone || isCurrent ? '#000' : 'var(--text-muted)',
+                        fontSize: battle.active ? '1rem' : '0.75rem', 
+                        fontWeight: 700, 
+                        color: isDone || isCurrent ? '#000' : 'var(--text-muted)',
                         flexShrink: 0,
                       }}>
                         {isDone ? '✓' : i + 1}
                       </div>
-                      {/* Seal mini image */}
+                      {/* Seal image */}
                       <div style={{
-                        width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)',
-                        borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: `1px solid ${isCurrent ? selectedJutsu.color : 'rgba(255,255,255,0.1)'}`,
-                        position: 'relative', overflow: 'hidden'
+                        width: battle.active ? '100%' : '40px', 
+                        aspectRatio: battle.active ? '1' : 'auto',
+                        height: battle.active ? 'auto' : '40px', 
+                        background: 'rgba(0,0,0,0.3)',
+                        borderRadius: '1rem', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: `2px solid ${isCurrent ? selectedJutsu.color : 'rgba(255,255,255,0.1)'}`,
+                        position: 'relative', overflow: 'hidden',
+                        boxShadow: battle.active ? '0 10px 20px rgba(0,0,0,0.4)' : 'none'
                       }}>
                         <img
                           src={`/seals/${sealName.toLowerCase()}.png`}
                           alt=""
-                          style={{ width: '80%', height: '80%', objectFit: 'contain', filter: isCurrent ? 'none' : 'grayscale(1) opacity(0.5)' }}
+                          style={{ width: '85%', height: '85%', objectFit: 'contain', filter: isCurrent ? 'none' : 'grayscale(1) opacity(0.5)' }}
                           onError={e => {
                             e.target.style.display = 'none';
                             e.target.nextSibling.style.display = 'flex';
                           }}
                         />
-                        <div style={{ display: 'none', fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
+                        <div style={{ display: 'none', fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
                           {sealName[0]}
                         </div>
                       </div>
-                      <div>
-                        <div style={{ fontFamily: 'var(--font-title)', fontSize: '0.95rem', letterSpacing: '0.06em', color: isDone ? '#22c55e' : isCurrent ? selectedJutsu.color : 'var(--text-muted)' }}>
+                      <div style={{ width: '100%' }}>
+                        <div style={{ 
+                          fontFamily: 'var(--font-title)', 
+                          fontSize: battle.active ? '1.5rem' : '0.95rem', 
+                          letterSpacing: '0.1em', 
+                          color: isDone ? '#22c55e' : isCurrent ? selectedJutsu.color : '#fff',
+                          marginTop: battle.active ? '0.5rem' : '0'
+                        }}>
                           {sealName}
                         </div>
                         {isCurrent && (
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }} id="ui-seal-progress">
-                            In attesa...
+                          <div style={{ fontSize: battle.active ? '0.8rem' : '0.65rem', color: 'var(--text-muted)' }} id="ui-seal-progress">
+                            Mantieni la posa...
                           </div>
                         )}
                       </div>
@@ -1338,12 +1360,12 @@ function App() {
         {battle.active && (
           <>
             {/* Enemy HP Bar */}
-            <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', width: '60%', zIndex: 100 }}>
+            <div style={{ position: 'absolute', top: '15px', left: '50%', transform: 'translateX(-50%)', width: '50%', zIndex: 110 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#fff', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                 <span>{BOSSES[battle.enemy]?.name ?? battle.enemy}</span>
                 <span>{battle.enemyHp} / {battle.enemyMaxHp ?? battle.enemyHp} HP</span>
               </div>
-              <div className="calibration-progress" style={{ height: '10px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)' }}>
+              <div className="calibration-progress" style={{ height: '8px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <div className="calibration-progress-fill" style={{ width: `${(battle.enemyHp / (battle.enemyMaxHp ?? battle.enemyHp)) * 100}%`, background: 'linear-gradient(90deg, #ef4444, #b91c1c)' }} />
               </div>
             </div>
@@ -1387,8 +1409,8 @@ function App() {
             </div>
 
             {/* Enemy Image Overlay */}
-            <div style={{ position: 'absolute', top: '15%', left: '30px', zIndex: 20, opacity: 0.85, filter: 'drop-shadow(0 0 20px rgba(0,0,0,0.5))' }}>
-              <img src={`/villain/${battle.enemy}.png`} alt="" style={{ height: '240px', objectFit: 'contain' }} />
+            <div style={{ position: 'absolute', top: '20%', left: '30px', zIndex: 30, opacity: 0.85, filter: 'drop-shadow(0 0 20px rgba(0,0,0,0.5))' }}>
+              <img src={`/villain/${battle.enemy}.png`} alt="" style={{ height: '220px', objectFit: 'contain' }} />
             </div>
           </>
         )}

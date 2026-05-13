@@ -485,8 +485,8 @@ h1, h2, h3, h4 {
 /* ── Video Recording ─────────────────────── */
 .rec-indicator {
   position: absolute;
-  top: 15px;
-  left: 15px;
+  top: 100px;
+  left: 20px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -576,9 +576,9 @@ h1, h2, h3, h4 {
 
 .deco-logo {
   position: absolute;
-  top: 15px;
-  left: 15px;
-  height: 80px;
+  top: 20px;
+  left: 20px;
+  height: 70px;
   z-index: 20;
   pointer-events: none;
   filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.4));
