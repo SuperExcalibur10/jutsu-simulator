@@ -60,6 +60,10 @@ function App() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(() => {
+    return !localStorage.getItem('jutsu_tutorial_seen');
+  });
+  const [tutorialStep, setTutorialStep] = useState(0);
 
   /* ── Progression state ──────────────────────── */
   const [totalXp, setTotalXp] = useState(() => {
@@ -266,6 +270,10 @@ function App() {
               setStats(cloudData.stats);
               localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify(cloudData.stats));
             }
+            if (cloudData.tutorialSeen) {
+              setShowTutorial(false);
+              localStorage.setItem('jutsu_tutorial_seen', 'true');
+            }
           } else {
             // Create user in Firestore — use XP already in state (from lazy localStorage init)
             const localXp = totalXpRef.current;
@@ -322,6 +330,7 @@ function App() {
           mastery: jutsuMasteryRef.current,
           achievements: achievementsRef.current,
           stats: statsRef.current,
+          tutorialSeen: localStorage.getItem('jutsu_tutorial_seen') === 'true',
           isHidden: user.email === import.meta.env.VITE_ADMIN_EMAIL,
           lastSeen: new Date()
         }, { merge: true });
@@ -330,6 +339,48 @@ function App() {
       }
     }
   }, [user]);
+
+  const closeTutorial = useCallback(() => {
+    setShowTutorial(false);
+    localStorage.setItem('jutsu_tutorial_seen', 'true');
+    syncProfileToCloud();
+  }, [syncProfileToCloud]);
+
+  const tutorialSlides = [
+    {
+      title: "BENVENUTO, SHINOBI!",
+      text: "Sei pronto a diventare un maestro delle arti ninja? Jutsu Simulator usa l'IA per riconoscere i tuoi sigilli manuali in tempo reale.",
+      icon: "🌀"
+    },
+    {
+      title: "1. SELEZIONA UNA TECNICA",
+      text: "Scegli un Jutsu dalla lista a sinistra. Alcune tecniche richiedono più Esperienza (XP) per essere sbloccate.",
+      icon: "📜"
+    },
+    {
+      title: "2. CALIBRAZIONE",
+      text: "Ogni telecamera e posizione è diversa. La prima volta che usi un sigillo, dovrai calibrarlo imitando l'immagine a schermo.",
+      icon: "👌"
+    },
+    {
+      title: "3. BATTAGLIE A TURNI",
+      text: "Affronta i villain leggendari. Alterna fasi di Attacco (esegui la tecnica velocemente) e fasi di Difesa (para i colpi nemici).",
+      icon: "⚔️"
+    },
+    {
+      title: "4. SALVA I PROGRESSI",
+      text: "Accedi con Google per sincronizzare il tuo Grado Ninja, gli Obiettivi e la Maestria su tutti i tuoi dispositivi.",
+      icon: "☁️"
+    }
+  ];
+
+  const nextTutorialStep = useCallback(() => {
+    if (tutorialStep < tutorialSlides.length - 1) {
+      setTutorialStep(s => s + 1);
+    } else {
+      closeTutorial();
+    }
+  }, [tutorialStep, closeTutorial, tutorialSlides]);
 
   const handleSaveName = useCallback(async () => {
     if (!tempName || !user) return;
@@ -703,7 +754,7 @@ function App() {
     const earned = Math.round(base * speedBonus);
     const newTotal = totalXpRef.current + earned;
     setTotalXp(prev => { const next = prev + earned; localStorage.setItem(STORAGE_KEY_XP, next.toString()); return next; });
-    syncXpToCloud(newTotal);
+    syncProfileToCloud(newTotal);
 
     // ── Achievements ──
     if (newTotal_ === 1)   unlockAchievement('first_steps');
@@ -840,6 +891,12 @@ function App() {
                 boxShadow: `0 0 6px ${isOnline ? '#22c55e88' : '#ef444488'}`,
                 flexShrink: 0,
               }} />
+              {/* Tutorial button */}
+              <button
+                onClick={() => { setTutorialStep(0); setShowTutorial(true); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', padding: '0.1rem', lineHeight: 1 }}
+                title="Riguarda Tutorial"
+              >❓</button>
               {/* Volume button */}
               <button
                 onClick={() => setShowVolumePanel(v => !v)}
@@ -1633,6 +1690,45 @@ function App() {
             <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginTop: '1.5rem' }}>
               I tuoi dati verranno crittografati e gestiti in modo sicuro tramite Firebase.
             </p>
+          </div>
+        </div>
+      )}
+      {/* ── Tutorial Overlay ───────────────────────── */}
+      {showTutorial && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(8, 8, 16, 0.9)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div className="glass-panel" style={{
+            maxWidth: '500px', width: '100%', padding: '2.5rem', textAlign: 'center',
+            border: '1px solid var(--naruto-orange)', boxShadow: '0 0 50px rgba(249, 115, 22, 0.2)',
+            animation: 'status-bounce 0.5s ease-out'
+          }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>{tutorialSlides[tutorialStep].icon}</div>
+            <h2 style={{ fontSize: '2rem', color: 'var(--naruto-orange)', marginBottom: '1rem' }}>
+              {tutorialSlides[tutorialStep].title}
+            </h2>
+            <p style={{ fontSize: '1.1rem', lineHeight: '1.6', color: 'var(--text-main)', marginBottom: '2rem' }}>
+              {tutorialSlides[tutorialStep].text}
+            </p>
+            
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
+              {tutorialSlides.map((_, i) => (
+                <div key={i} style={{
+                  width: '12px', height: '12px', borderRadius: '50%',
+                  background: i === tutorialStep ? 'var(--naruto-orange)' : 'rgba(255,255,255,0.1)',
+                  transition: 'all 0.3s'
+                }} />
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="ninja-btn" style={{ flex: 1 }} onClick={closeTutorial}>Salta</button>
+              <button className="ninja-btn primary" style={{ flex: 2 }} onClick={nextTutorialStep}>
+                {tutorialStep === tutorialSlides.length - 1 ? "INIZIA" : "AVANTI"}
+              </button>
+            </div>
           </div>
         </div>
       )}
