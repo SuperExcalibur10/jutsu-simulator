@@ -1266,7 +1266,9 @@ function App() {
                 {selectedJutsu.sequence.map((sealName, i) => {
                   const isDone = i < sequenceStep;
                   const isCurrent = i === sequenceStep;
-                  // const isNext = i > sequenceStep;
+
+                  // In battle, show only the current seal to avoid scrolling and improve focus
+                  if (battle.active && !isCurrent) return null;
                   return (
                     <div key={i} style={{
                       display: 'flex', alignItems: 'center', gap: '0.75rem',

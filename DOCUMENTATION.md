@@ -54,6 +54,7 @@ Lato front-end, gli input stringa (es. il Nickname personalizzato) vengono sanif
 ### Battle Mode
 Il sistema di combattimento (`battle` state) implementa un loop **turn-based** (a turni) progettato per testare riflessi e precisione:
 - **Ciclo di Combattimento**: La battaglia alterna una fase di **Attacco** (turno giocatore) e una fase di **Difesa** (turno nemico).
+- **UI Focus Dinamico**: Durante la battaglia, la sequenza dei sigilli viene mostrata un passo alla volta invece che in elenco, eliminando la necessità di scorrimento e migliorando la velocità di reazione del giocatore.
 - **Meccanica di Attacco**: Il danno inflitto dipende dalla velocità di esecuzione. Sotto i 5s si ottiene un Colpo Critico (1.3x), tra 5-9s un danno normale, oltre i 9s il nemico parerà riducendo il danno (0.6x).
 - **Meccanica di Difesa**: Quando il nemico attacca, l'utente deve eseguire una tecnica per parare. Sotto i 5s si ottiene una "Parata Perfetta" (0 danni), tra 5-9s una "Parata Parziale" (0.2x danni), altrimenti si subisce il danno pieno.
 - **Timer & Penalità**: Ogni turno ha una finestra di 12 secondi. Se il tempo scade durante l'attacco, il colpo fallisce. Se scade durante la difesa, l'utente subisce un **danno critico (1.3x)**.
