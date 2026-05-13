@@ -52,11 +52,14 @@ Lato front-end, gli input stringa (es. il Nickname personalizzato) vengono sanif
 ## 4. Game Logic & Progression
 
 ### Battle Mode
-Il sistema di combattimento (`battle` state) implementa un loop basato sui riflessi e sulla progressione:
-- **Selezione Avversario**: L'utente può scegliere tra 12 nemici leggendari (da Zabuza a Kaguya) tramite un menu dedicato. L'accesso ai nemici più forti è vincolato alla soglia di XP posseduti (`minXp`).
-- **Scaling dei Premi**: Ogni vittoria garantisce un `xpReward` proporzionale alla forza del nemico (es. Zabuza: 100 XP, Kaguya: 1000 XP).
+Il sistema di combattimento (`battle` state) implementa un loop **turn-based** (a turni) progettato per testare riflessi e precisione:
+- **Ciclo di Combattimento**: La battaglia alterna una fase di **Attacco** (turno giocatore) e una fase di **Difesa** (turno nemico).
+- **Meccanica di Attacco**: Il danno inflitto dipende dalla velocità di esecuzione. Sotto i 5s si ottiene un Colpo Critico (1.3x), tra 5-9s un danno normale, oltre i 9s il nemico parerà riducendo il danno (0.6x).
+- **Meccanica di Difesa**: Quando il nemico attacca, l'utente deve eseguire una tecnica per parare. Sotto i 5s si ottiene una "Parata Perfetta" (0 danni), tra 5-9s una "Parata Parziale" (0.2x danni), altrimenti si subisce il danno pieno.
+- **Timer & Penalità**: Ogni turno ha una finestra di 12 secondi. Se il tempo scade durante l'attacco, il colpo fallisce. Se scade durante la difesa, l'utente subisce un **danno critico (1.3x)**.
+- **Selezione Avversario**: L'utente può scegliere tra 12 nemici leggendari (da Zabuza a Kaguya). L'accesso ai nemici più forti è vincolato alla soglia di XP posseduti.
+- **Scaling dei Premi**: Ogni vittoria garantisce un `xpReward` proporzionale alla forza del nemico.
 - **HP del Giocatore**: La salute massima scala con il grado Ninja (Academy: 100 HP → Kage: 300 HP).
-- **Timer & Danni**: L'utente ha 12 secondi per completare la sequenza. Se il tempo scade, il nemico colpisce con una tecnica speciale lore-accurate e la tecnica richiesta ruota casualmente per mantenere dinamico lo scontro.
 
 ---
 

@@ -30,7 +30,7 @@ Firebase credentials are required even in dev — the app calls Firestore and Au
 jutsu-select → calibration → perform → effect (JutsuEffect overlay)
              ↑                                ↓
              └────────── (battle active) ─────┘
-jutsu-select → boss-select → battle → perform → effect → (next battle jutsu)
+jutsu-select → boss-select → battle (prep) → perform (Attack Turn) → effect → perform (Defense Turn) → effect → (Loop)
 jutsu-select → recalibrate-menu → calibration → jutsu-select
 jutsu-select → leaderboard
 jutsu-select → profile

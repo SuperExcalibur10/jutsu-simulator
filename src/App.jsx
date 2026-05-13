@@ -517,7 +517,10 @@ function App() {
     
     // Reset timer for the new command
     const isPlayerTurn = battleRef.current.turn === 'player';
-    const statusMsg = isPlayerTurn ? `ATTACCA! USA ${random.name}!` : `DIFENDITI! REAGISCI CON ${random.name}!`;
+    const boss = BOSSES[battleRef.current.enemy];
+    const statusMsg = isPlayerTurn 
+      ? `ATTACCA! USA ${random.name}!` 
+      : `DIFENDITI DA ${boss?.specialAttack?.toUpperCase() || 'ATTACCO'}! USA ${random.name}!`;
     setBattle(prev => ({ ...prev, timer: 12, status: statusMsg }));
     
     // Check if calibrated
@@ -554,7 +557,7 @@ function App() {
       userMaxHp: currentRank.maxHp,
       enemyHp: bossData.maxHp,
       enemyMaxHp: bossData.maxHp,
-      timer: 10,
+      timer: 0,
       turn: 'player',
       status: 'PREPARATI AL COMBATTIMENTO! TOCCA A TE ATTACCARE.',
       damageFlash: false
@@ -564,7 +567,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (!battle.active || mode === 'effect') return;
+    if (!battle.active || mode !== 'perform') return;
     const t = setInterval(() => {
       setBattle(prev => {
         if (prev.timer <= 1) {

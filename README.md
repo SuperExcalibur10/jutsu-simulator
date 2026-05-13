@@ -13,8 +13,9 @@ A high-performance web application that uses **real-time computer vision** to re
 ## 🌟 Key Features
 
 - **🎯 Real-Time Hand Tracking**: Powered by Google's MediaPipe for high-precision detection of 21 hand landmarks per hand, fully supporting complex two-handed jutsu.
-- **👹 Legendary Boss Rush**: Face 12 iconic villains. Access the **Enemy Selection Menu** to choose your target or gamble with a random encounter.
-- **📈 Progressive Scaling**: Your ninja rank dictates your Max HP, while enemies scale in lethality and rewards as you climb the leaderboard.
+- **⚔️ Turn-Based Battle System**: Experience strategic combat with dedicated Attack and Defense phases. Speed and elemental affinities determine damage, parries, and critical hits.
+- **👹 Legendary Boss Rush**: Face 12 iconic villains with anime-accurate special attacks. Access the **Enemy Selection Menu** to choose your target.
+- **📈 Progressive Scaling**: Your ninja rank dictates your Max HP, while enemies scale in lethality as you climb the leaderboard.
 - **🎵 Cinematic OST**: Integrated music player with pause/skip controls and a library of 9 iconic Naruto tracks.
 - **☁️ Cloud Sync**: Secure Google login via **Firebase Authentication** with real-time XP and rank synchronization via **Cloud Firestore**.
 - **🎥 Session Recording**: Capture and download your jutsu performances with the integrated browser screen recorder.
@@ -28,33 +29,33 @@ A high-performance web application that uses **real-time computer vision** to re
 | **Bunshin no Jutsu** | Naruto | 20 | 0 | Multi-Clone Visual |
 | **Katon: Gōkakyū** | Sasuke | 35 | 0 | Fire Explosion |
 | **Rasengan** | Naruto | 40 | 0 | Wind Sphere |
-| **Chidori** | Kakashi | 45 | 600 | Lightning Strike |
-| **Kage Bunshin** | Naruto | 50 | 1,200 | Shadow Clones |
-| **Kuchiyose** | Jiraiya | 65 | 2,500 | Summon Gamabunta |
-| **Suiton: Suiryūdan** | Kisame | 80 | 4,500 | Water Dragon |
-| **Mangekyō Sharingan** | Itachi | 100 | 6,000 | Tsukuyomi Illusion |
-| **Susanoo** | Itachi | 125 | 8,000 | Spectral Armor |
-| **Shinra Tensei** | Pain | 150 | 12,000 | Repulsion Pulse |
-| **Indra no Ya** | Sasuke | 200 | 16,000 | Indra's Arrow |
+| **Chidori** | Kakashi | 45 | 2,000 | Lightning Strike |
+| **Kage Bunshin** | Naruto | 50 | 4,000 | Shadow Clones |
+| **Kuchiyose** | Jiraiya | 65 | 6,000 | Summon Gamabunta |
+| **Suiton: Suiryūdan** | Kisame | 80 | 8,000 | Water Dragon |
+| **Mangekyō Sharingan** | Itachi | 100 | 10,000 | Tsukuyomi Illusion |
+| **Susanoo** | Itachi | 125 | 12,000 | Spectral Armor |
+| **Shinra Tensei** | Pain | 150 | 14,000 | Repulsion Pulse |
+| **Indra no Ya** | Sasuke | 200 | 15,000 | Indra's Arrow |
 
 ## 👹 Legendary Villains
 
 Choose your opponent from the strategic selection menu. Each boss has unique HP and specific XP rewards.
 
-| Villain | HP | Req. XP | Reward |
+| Villain | HP | Req. XP | Special Attack |
 | :--- | :--- | :--- | :--- |
-| **Zabuza** | 80 | 0 | 100 XP |
-| **Deidara** | 120 | 400 | 150 XP |
-| **Orochimaru** | 140 | 1,000 | 200 XP |
-| **Kabuto** | 160 | 1,800 | 250 XP |
-| **Danzō** | 180 | 2,800 | 300 XP |
-| **Itachi** | 200 | 4,000 | 400 XP |
-| **Sasuke** | 220 | 5,500 | 500 XP |
-| **Pain** | 250 | 7,500 | 600 XP |
-| **Obito** | 280 | 10,000 | 700 XP |
-| **Madara** | 320 | 13,000 | 800 XP |
-| **Zetsu Nero** | 360 | 16,000 | 900 XP |
-| **Kaguya** | 400 | 19,000 | 1,000 XP |
+| **Zabuza** | 80 | 0 | Suiton: Suiryūdan |
+| **Deidara** | 120 | 1,000 | C4 Karura |
+| **Orochimaru** | 140 | 2,500 | Kusanagi: Murakumo |
+| **Kabuto** | 160 | 4,000 | Senpō: Hakugeki no Jutsu |
+| **Danzō** | 180 | 5,500 | Fūton: Shinkū Gyoku |
+| **Itachi** | 200 | 7,000 | Amaterasu |
+| **Sasuke** | 220 | 8,500 | Indra no Ya |
+| **Pain** | 250 | 10,000 | Shinra Tensei |
+| **Obito** | 280 | 11,500 | Kamui |
+| **Madara** | 320 | 13,000 | Tengai Shinsei |
+| **Zetsu Nero** | 360 | 14,000 | Kuro-Zetsu: Fukkatsu |
+| **Kaguya** | 400 | 15,000 | Tomogoroshi no Haikotsu |
 
 ## 📉 Ninja Ranks & HP
 
