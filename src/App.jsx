@@ -215,8 +215,11 @@ function App() {
     achievementsRef.current = updated;
     localStorage.setItem(STORAGE_KEY_ACHIEVEMENTS, JSON.stringify(updated));
     const ach = ACHIEVEMENTS.find(a => a.id === id);
-    if (ach) setNewAchievement(ach);
-  }, [setAchievements, setNewAchievement]);
+    if (ach) {
+      setNewAchievement(ach);
+      syncProfileToCloud();
+    }
+  }, [setAchievements, setNewAchievement, syncProfileToCloud]);
 
   /* ── Achievement: all seals calibrated ──────── */
   useEffect(() => {
@@ -247,9 +250,22 @@ function App() {
             if (cloudData.name) {
               setPlayerName(cloudData.name);
             }
-            // Usa sempre i dati del cloud per gli account esistenti (previene ereditarietà tra account)
+            // Sync all progress data from cloud
             setTotalXp(cloudXp);
             localStorage.setItem(STORAGE_KEY_XP, cloudXp.toString());
+
+            if (cloudData.mastery) {
+              setJutsuMastery(cloudData.mastery);
+              localStorage.setItem(STORAGE_KEY_MASTERY, JSON.stringify(cloudData.mastery));
+            }
+            if (cloudData.achievements) {
+              setAchievements(cloudData.achievements);
+              localStorage.setItem(STORAGE_KEY_ACHIEVEMENTS, JSON.stringify(cloudData.achievements));
+            }
+            if (cloudData.stats) {
+              setStats(cloudData.stats);
+              localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify(cloudData.stats));
+            }
           } else {
             // Create user in Firestore — use XP already in state (from lazy localStorage init)
             const localXp = totalXpRef.current;
@@ -259,6 +275,9 @@ function App() {
               xp: localXp,
               rank: getCurrentRank(localXp).name,
               photo: firebaseUser.photoURL,
+              mastery: jutsuMasteryRef.current,
+              achievements: achievementsRef.current,
+              stats: statsRef.current,
               isHidden: isAdmin,
               lastSeen: new Date()
             });
@@ -293,14 +312,16 @@ function App() {
     localStorage.removeItem(STORAGE_KEY_XP);
   }, []);
 
-  const syncXpToCloud = useCallback(async (newTotal) => {
+  const syncProfileToCloud = useCallback(async (newTotal = totalXpRef.current) => {
     if (user) {
-      const userRef = doc(db, 'players', user.uid);
       try {
+        const userRef = doc(db, 'players', user.uid);
         await setDoc(userRef, {
           xp: newTotal,
           rank: getCurrentRank(newTotal).name,
           mastery: jutsuMasteryRef.current,
+          achievements: achievementsRef.current,
+          stats: statsRef.current,
           isHidden: user.email === import.meta.env.VITE_ADMIN_EMAIL,
           lastSeen: new Date()
         }, { merge: true });
@@ -631,7 +652,7 @@ function App() {
         if (defeatedEnemy === 'kaguya') unlockAchievement('kaguya_defeated');
         // XP
         setTotalXp(prev => { const next = prev + bonus; localStorage.setItem(STORAGE_KEY_XP, next.toString()); return next; });
-        syncXpToCloud(totalXpRef.current + bonus);
+        syncProfileToCloud(totalXpRef.current + bonus);
         setLastXpEarned(bonus);
         setXpPopupTitle(`HAI SCONFITTO ${bossData?.name.toUpperCase() || defeatedEnemy.toUpperCase()}!`);
         setShowXpPopup(true);
@@ -640,7 +661,7 @@ function App() {
         setTimeout(() => setShowXpPopup(false), 4000);
       }, 500);
     }
-  }, [battle.userHp, battle.enemyHp, battle.active, battle.enemy, syncXpToCloud, unlockAchievement]);
+  }, [battle.userHp, battle.enemyHp, battle.active, battle.enemy, syncProfileToCloud, unlockAchievement]);
 
   /* ── Jutsu complete ─────────────────────────── */
   const handleJutsuComplete = useCallback(() => {
@@ -663,6 +684,7 @@ function App() {
     setJutsuMastery(newMastery);
     jutsuMasteryRef.current = newMastery;
     localStorage.setItem(STORAGE_KEY_MASTERY, JSON.stringify(newMastery));
+    syncProfileToCloud();
 
     // ── Stats tracking ──
     const prevStats = statsRef.current;
