@@ -36,6 +36,34 @@ const BACKGROUND_MUSIC = [
   { title: "Silhouette", file: "/sounds/Silhouette.mp3" }
 ];
 
+const TUTORIAL_SLIDES = [
+  {
+    title: "BENVENUTO, SHINOBI!",
+    text: "Sei pronto a diventare un maestro delle arti ninja? Jutsu Simulator usa l'IA per riconoscere i tuoi sigilli manuali in tempo reale.",
+    icon: "🌀"
+  },
+  {
+    title: "1. SELEZIONA UNA TECNICA",
+    text: "Scegli un Jutsu dalla lista a sinistra. Alcune tecniche richiedono più Esperienza (XP) per essere sbloccate.",
+    icon: "📜"
+  },
+  {
+    title: "2. CALIBRAZIONE",
+    text: "Ogni telecamera e posizione è diversa. La prima volta che usi un sigillo, dovrai calibrarlo imitando l'immagine a schermo.",
+    icon: "👌"
+  },
+  {
+    title: "3. BATTAGLIE A TURNI",
+    text: "Affronta i villain leggendari. Alterna fasi di Attacco (esegui la tecnica velocemente) e fasi di Difesa (para i colpi nemici).",
+    icon: "⚔️"
+  },
+  {
+    title: "4. SALVA I PROGRESSI",
+    text: "Accedi con Google per sincronizzare il tuo Grado Ninja, gli Obiettivi e la Maestria su tutti i tuoi dispositivi.",
+    icon: "☁️"
+  }
+];
+
 function App() {
   /* ── Core state ─────────────────────────────── */
   const [calibratedSeals, setCalibratedSeals] = useState(() => {
@@ -241,7 +269,7 @@ function App() {
       try {
         if (firebaseUser) {
           setUser(firebaseUser);
-          setPlayerName(firebaseUser.displayName);
+          setPlayerName(firebaseUser.displayName || '');
           setShowLoginPrompt(false);
           
           // Sync with Firestore
@@ -267,8 +295,9 @@ function App() {
               localStorage.setItem(STORAGE_KEY_ACHIEVEMENTS, JSON.stringify(cloudData.achievements));
             }
             if (cloudData.stats) {
-              setStats(cloudData.stats);
-              localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify(cloudData.stats));
+              const mergedStats = { ...DEFAULT_STATS, ...cloudData.stats };
+              setStats(mergedStats);
+              localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify(mergedStats));
             }
             if (cloudData.tutorialSeen) {
               setShowTutorial(false);
@@ -346,41 +375,15 @@ function App() {
     syncProfileToCloud();
   }, [syncProfileToCloud]);
 
-  const tutorialSlides = [
-    {
-      title: "BENVENUTO, SHINOBI!",
-      text: "Sei pronto a diventare un maestro delle arti ninja? Jutsu Simulator usa l'IA per riconoscere i tuoi sigilli manuali in tempo reale.",
-      icon: "🌀"
-    },
-    {
-      title: "1. SELEZIONA UNA TECNICA",
-      text: "Scegli un Jutsu dalla lista a sinistra. Alcune tecniche richiedono più Esperienza (XP) per essere sbloccate.",
-      icon: "📜"
-    },
-    {
-      title: "2. CALIBRAZIONE",
-      text: "Ogni telecamera e posizione è diversa. La prima volta che usi un sigillo, dovrai calibrarlo imitando l'immagine a schermo.",
-      icon: "👌"
-    },
-    {
-      title: "3. BATTAGLIE A TURNI",
-      text: "Affronta i villain leggendari. Alterna fasi di Attacco (esegui la tecnica velocemente) e fasi di Difesa (para i colpi nemici).",
-      icon: "⚔️"
-    },
-    {
-      title: "4. SALVA I PROGRESSI",
-      text: "Accedi con Google per sincronizzare il tuo Grado Ninja, gli Obiettivi e la Maestria su tutti i tuoi dispositivi.",
-      icon: "☁️"
-    }
-  ];
+
 
   const nextTutorialStep = useCallback(() => {
-    if (tutorialStep < tutorialSlides.length - 1) {
+    if (tutorialStep < TUTORIAL_SLIDES.length - 1) {
       setTutorialStep(s => s + 1);
     } else {
       closeTutorial();
     }
-  }, [tutorialStep, closeTutorial, tutorialSlides]);
+  }, [tutorialStep, closeTutorial]);
 
   const handleSaveName = useCallback(async () => {
     if (!tempName || !user) return;
@@ -1705,16 +1708,16 @@ function App() {
             border: '1px solid var(--naruto-orange)', boxShadow: '0 0 50px rgba(249, 115, 22, 0.2)',
             animation: 'status-bounce 0.5s ease-out'
           }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>{tutorialSlides[tutorialStep].icon}</div>
+            <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>{TUTORIAL_SLIDES[tutorialStep]?.icon}</div>
             <h2 style={{ fontSize: '2rem', color: 'var(--naruto-orange)', marginBottom: '1rem' }}>
-              {tutorialSlides[tutorialStep].title}
+              {TUTORIAL_SLIDES[tutorialStep]?.title}
             </h2>
             <p style={{ fontSize: '1.1rem', lineHeight: '1.6', color: 'var(--text-main)', marginBottom: '2rem' }}>
-              {tutorialSlides[tutorialStep].text}
+              {TUTORIAL_SLIDES[tutorialStep]?.text}
             </p>
             
             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
-              {tutorialSlides.map((_, i) => (
+              {TUTORIAL_SLIDES.map((_, i) => (
                 <div key={i} style={{
                   width: '12px', height: '12px', borderRadius: '50%',
                   background: i === tutorialStep ? 'var(--naruto-orange)' : 'rgba(255,255,255,0.1)',
@@ -1726,7 +1729,7 @@ function App() {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button className="ninja-btn" style={{ flex: 1 }} onClick={closeTutorial}>Salta</button>
               <button className="ninja-btn primary" style={{ flex: 2 }} onClick={nextTutorialStep}>
-                {tutorialStep === tutorialSlides.length - 1 ? "INIZIA" : "AVANTI"}
+                {tutorialStep === TUTORIAL_SLIDES.length - 1 ? "INIZIA" : "AVANTI"}
               </button>
             </div>
           </div>
