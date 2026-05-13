@@ -590,7 +590,7 @@ function App() {
               timer: 12, 
               turn: 'player', 
               userHp: newHp, 
-              status: `NON HAI REAGITO! COLPITO IN PIENO (-${penaltyDmg} HP).`, 
+              status: `NON HAI REAGITO A ${boss?.specialAttack?.toUpperCase() || 'ATTACCO'}! COLPITO IN PIENO (-${penaltyDmg} HP).`, 
               damageFlash: true 
             };
           }
@@ -731,13 +731,13 @@ function App() {
         enemyHp: newEnemyHp, 
         timer: 12, 
         turn: 'enemy', 
-        status: `${hitStatus}. ORA DIFENDITI!` 
+        status: `${hitStatus}. DIFENDITI DA ${bossData?.specialAttack?.toUpperCase() || 'ATTACCO'}!` 
       }));
       if (newEnemyHp > 0) setTimeout(pickRandomJutsuForBattle, 800);
     } else {
       // Player defends
       const bossDmg = bossData?.specialDamage ?? 20;
-      const defenseMult = duration < 5 ? 0 : (duration < 9 ? 0.4 : 1.0);
+      const defenseMult = duration < 5 ? 0 : (duration < 9 ? 0.2 : 1.0);
       const damageTaken = Math.round(bossDmg * defenseMult);
       const newUserHp = Math.max(0, currentBattle.userHp - damageTaken);
       
