@@ -1355,12 +1355,28 @@ function App() {
             </div>
 
             {/* Battle Timer & Status */}
-            <div style={{ position: 'absolute', top: '50%', right: '40px', transform: 'translateY(-50%)', textAlign: 'right', zIndex: 100 }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Tempo rimasto</div>
+            <div style={{ position: 'absolute', top: '50%', right: '40px', transform: 'translateY(-50%)', textAlign: 'right', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+              
+              <div style={{ 
+                padding: '0.4rem 1rem', 
+                background: battle.turn === 'player' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                border: `1px solid ${battle.turn === 'player' ? '#22c55e' : '#ef4444'}`,
+                borderRadius: '0.5rem',
+                fontFamily: 'var(--font-title)', fontSize: '0.8rem', 
+                color: battle.turn === 'player' ? '#22c55e' : '#ef4444',
+                textAlign: 'center',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                boxShadow: `0 0 15px ${battle.turn === 'player' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+              }}>
+                {battle.turn === 'player' ? '✦ TUO TURNO: ATTACCO ✦' : '💀 TURNO NEMICO: DIFESA 💀'}
+              </div>
+
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '0.5rem' }}>Tempo rimasto</div>
               <div style={{ fontFamily: 'var(--font-title)', fontSize: '4rem', color: battle.timer <= 3 ? '#ef4444' : '#fff', lineHeight: 1 }}>
                 {battle.timer}
               </div>
-              <div style={{ marginTop: '1rem', fontFamily: 'var(--font-title)', fontSize: '1.2rem', color: 'var(--naruto-orange)' }}>
+              <div style={{ marginTop: '0.5rem', fontFamily: 'var(--font-title)', fontSize: '1.2rem', color: 'var(--naruto-orange)', maxWidth: '250px' }}>
                 {battle.status}
               </div>
             </div>
