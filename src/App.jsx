@@ -97,8 +97,11 @@ function App() {
     active: false,
     enemy: null,
     userHp: 100,
+    userMaxHp: 100,
     enemyHp: 100,
+    enemyMaxHp: 100,
     timer: 0,
+    turn: 'player',
     status: '',
     damageFlash: false
   });
@@ -489,7 +492,14 @@ function App() {
 
   /* ── Battle Logic ───────────────────────────── */
   const pickRandomJutsuForBattle = useCallback(() => {
-    const allUnlocked = Object.values(JUTSUS).filter(j => totalXp >= (j.minXp || 0));
+    const allUnlocked = Object.values(JUTSUS).filter(j => {
+      if (totalXp < (j.minXp || 0)) return false;
+      // In battle, don't pick healing if HP is full
+      if (j.effectType === 'heal' && battleRef.current.userHp >= (battleRef.current.userMaxHp || 100)) {
+        return false;
+      }
+      return true;
+    });
     
     // Prioritize jutsus that have already been fully calibrated to prevent battle flow interruption
     let unlocked = allUnlocked.filter(j => 
@@ -506,7 +516,9 @@ function App() {
     selectedJutsuRef.current = random;
     
     // Reset timer for the new command
-    setBattle(prev => ({ ...prev, timer: 12, status: `PRESTO! USA ${random.name}!` }));
+    const isPlayerTurn = battleRef.current.turn === 'player';
+    const statusMsg = isPlayerTurn ? `ATTACCA! USA ${random.name}!` : `DIFENDITI! REAGISCI CON ${random.name}!`;
+    setBattle(prev => ({ ...prev, timer: 12, status: statusMsg }));
     
     // Check if calibrated
     const missing = random.sequence.filter(s => !calibratedSealsRef.current[s]);
@@ -543,7 +555,8 @@ function App() {
       enemyHp: bossData.maxHp,
       enemyMaxHp: bossData.maxHp,
       timer: 10,
-      status: 'PREPARATI AL COMBATTIMENTO!',
+      turn: 'player',
+      status: 'PREPARATI AL COMBATTIMENTO! TOCCA A TE ATTACCARE.',
       damageFlash: false
     });
 
@@ -556,14 +569,31 @@ function App() {
       setBattle(prev => {
         if (prev.timer <= 1) {
           const boss = BOSSES[prev.enemy];
-          const dmg = boss?.specialDamage ?? 20;
-          const newHp = Math.max(0, prev.userHp - dmg);
-          const status = boss ? `${boss.specialAttack}! -${dmg} HP` : 'COLPITO!';
-          
-          // Se scade il tempo, cambia tecnica come richiesto
-          setTimeout(pickRandomJutsuForBattle, 0);
-          
-          return { ...prev, timer: 12, userHp: newHp, status, damageFlash: true };
+          const bossDmg = boss?.specialDamage ?? 20;
+
+          if (prev.turn === 'player') {
+            // Player missed attack turn
+            setTimeout(pickRandomJutsuForBattle, 0);
+            return { 
+              ...prev, 
+              timer: 12, 
+              turn: 'enemy', 
+              status: 'TEMPO SCADUTO! HAI MANCATO IL COLPO.' 
+            };
+          } else {
+            // Player missed defense turn
+            const penaltyDmg = Math.round(bossDmg * 1.3);
+            const newHp = Math.max(0, prev.userHp - penaltyDmg);
+            setTimeout(pickRandomJutsuForBattle, 0);
+            return { 
+              ...prev, 
+              timer: 12, 
+              turn: 'player', 
+              userHp: newHp, 
+              status: `NON HAI REAGITO! COLPITO IN PIENO (-${penaltyDmg} HP).`, 
+              damageFlash: true 
+            };
+          }
         }
         return { ...prev, timer: prev.timer - 1, damageFlash: false };
       });
@@ -667,22 +697,64 @@ function App() {
     if (!currentBattle.active) return;
 
     if (jutsu.effectType === 'heal') {
-      setBattle(prev => ({ ...prev, userHp: Math.min(prev.userMaxHp || 100, prev.userHp + 30), timer: 12, status: 'FERITE RIMARGINATE!' }));
+      const healAmt = 30;
+      setBattle(prev => ({ 
+        ...prev, 
+        userHp: Math.min(prev.userMaxHp || 100, prev.userHp + healAmt), 
+        timer: 12, 
+        turn: prev.turn === 'player' ? 'enemy' : 'player',
+        status: `FERITE RIMARGINATE! (+${healAmt} HP)` 
+      }));
       setTimeout(pickRandomJutsuForBattle, 800);
       return;
     }
 
-    // ── Boss damage (mastery + weakness bonus) ──
+    // ── Boss interaction (Attack or Defense) ──
     const bossData = BOSSES[currentBattle.enemy];
     const masteryLvl = getMasteryLevel(newMastery[jutsu.id] || 0).level;
-    const baseDmg = (jutsu.damage || 20) + masteryLvl * 5;
+    const baseVal = (jutsu.damage || 20) + masteryLvl * 5;
     const weaknessBonus = bossData?.weakness === jutsu.effectType ? 15 : 0;
-    const damage = baseDmg + weaknessBonus;
-    const newEnemyHp = Math.max(0, currentBattle.enemyHp - damage);
-    const hitStatus = weaknessBonus > 0 ? `COLPO CRITICO! -${damage} HP!` : `OTTIMO COLPO! -${damage} HP`;
-    setBattle(prev => ({ ...prev, enemyHp: newEnemyHp, timer: 12, status: hitStatus }));
 
-    if (newEnemyHp > 0) setTimeout(pickRandomJutsuForBattle, 800);
+    if (currentBattle.turn === 'player') {
+      // Player attacks
+      const speedMult = duration < 5 ? 1.3 : (duration < 9 ? 1.0 : 0.6);
+      const damage = Math.round((baseVal + weaknessBonus) * speedMult);
+      const newEnemyHp = Math.max(0, currentBattle.enemyHp - damage);
+      
+      let hitStatus = `OTTIMO COLPO! -${damage} HP`;
+      if (speedMult > 1) hitStatus = `COLPO CRITICO! -${damage} HP!`;
+      else if (speedMult < 1) hitStatus = `NEMICO HA PARATO! -${damage} HP`;
+      else if (weaknessBonus > 0) hitStatus = `DEBOLEZZA NEMICA! -${damage} HP!`;
+
+      setBattle(prev => ({ 
+        ...prev, 
+        enemyHp: newEnemyHp, 
+        timer: 12, 
+        turn: 'enemy', 
+        status: `${hitStatus}. ORA DIFENDITI!` 
+      }));
+      if (newEnemyHp > 0) setTimeout(pickRandomJutsuForBattle, 800);
+    } else {
+      // Player defends
+      const bossDmg = bossData?.specialDamage ?? 20;
+      const defenseMult = duration < 5 ? 0 : (duration < 9 ? 0.4 : 1.0);
+      const damageTaken = Math.round(bossDmg * defenseMult);
+      const newUserHp = Math.max(0, currentBattle.userHp - damageTaken);
+      
+      let defStatus = `COLPITO! -${damageTaken} HP`;
+      if (defenseMult === 0) defStatus = `PARATA PERFETTA! 0 DANNI`;
+      else if (defenseMult < 1) defStatus = `PARATA PARZIALE! -${damageTaken} HP`;
+
+      setBattle(prev => ({ 
+        ...prev, 
+        userHp: newUserHp, 
+        timer: 12, 
+        turn: 'player', 
+        status: `${defStatus}. ORA ATTACCA!`,
+        damageFlash: damageTaken > 0
+      }));
+      if (newUserHp > 0) setTimeout(pickRandomJutsuForBattle, 800);
+    }
     // newEnemyHp === 0 → battle.enemyHp useEffect handles victory
   }, [pickRandomJutsuForBattle, syncXpToCloud, setSelectedJutsu, setMode, unlockAchievement]);
 
